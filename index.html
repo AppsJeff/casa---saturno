@@ -21,6 +21,7 @@
 <!-- Firebase (banco de dados online) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{
     --void:#0a0a16;
@@ -395,6 +396,7 @@
     <button class="backup-btn" id="exportBtn">☁ Exportar backup</button>
     <button class="backup-btn" id="importBtn">⬆ Importar backup</button>
     <button class="backup-btn" id="settingsBtn">⚙ Conexão</button>
+    <button class="backup-btn" id="logoutBtn">⎋ Sair</button>
     <input type="file" id="importFile" accept="application/json" style="display:none;">
   </div>
 
@@ -548,8 +550,30 @@
   </div>
 </div>
 
+<!-- TELA DE LOGIN (e-mail + senha) -->
+<div class="overlay" id="loginScreen" style="z-index:290;">
+  <div class="modal">
+    <h2><span>Entrar</span></h2>
+    <p style="font-size:13px; color:var(--text-dim); line-height:1.5; margin:0 0 14px;">
+      Digite o e-mail e a senha que foram criados para você no Firebase (peça para quem administra a Casa Saturno, se ainda não tiver).
+    </p>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" placeholder="voce@exemplo.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div id="loginError" style="display:none; color:var(--danger); font-size:12.5px; margin-bottom:10px; line-height:1.4;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn primary cyan" id="loginSubmitBtn" style="flex:1;">Entrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- TELA DE CONEXÃO COM O BANCO DE DADOS (Firebase) -->
-<div class="overlay" id="setupScreen">
+<div class="overlay" id="setupScreen" style="z-index:300;">
   <div class="modal">
     <h2><span>Conectar ao banco de dados</span></h2>
     <p style="font-size:13px; color:var(--text-dim); line-height:1.5; margin:0 0 14px;">
@@ -698,7 +722,6 @@
     db = firebase.firestore();
     try{ await db.enablePersistence({synchronizeTabs:true}); }
     catch(e){ /* aba múltipla aberta ou navegador sem suporte: segue sem cache offline avançado */ }
-    attachListeners();
   }
 
   function attachListeners(){
@@ -1302,6 +1325,55 @@
     reader.readAsText(file);
   });
 
+  // ---------- login (Firebase Authentication) ----------
+  const loginScreen = document.getElementById('loginScreen');
+  const loginEmail = document.getElementById('loginEmail');
+  const loginPassword = document.getElementById('loginPassword');
+  const loginError = document.getElementById('loginError');
+
+  function showLoginError(msg){
+    loginError.textContent = msg;
+    loginError.style.display = '';
+  }
+
+  function watchAuth(){
+    firebase.auth().onAuthStateChanged((user)=>{
+      if(user){
+        loginScreen.classList.remove('show');
+        attachListeners();
+      } else {
+        loginScreen.classList.add('show');
+        if(unsubReleases){ unsubReleases(); unsubReleases = null; }
+        if(unsubArtists){ unsubArtists(); unsubArtists = null; }
+      }
+    });
+  }
+
+  document.getElementById('loginSubmitBtn').addEventListener('click', async ()=>{
+    loginError.style.display = 'none';
+    const email = loginEmail.value.trim();
+    const pass = loginPassword.value;
+    if(!email || !pass){ showLoginError('Preencha e-mail e senha.'); return; }
+    try{
+      await firebase.auth().signInWithEmailAndPassword(email, pass);
+      loginPassword.value = '';
+    }catch(err){
+      const map = {
+        'auth/invalid-email': 'E-mail inválido.',
+        'auth/user-not-found': 'Não existe conta com esse e-mail.',
+        'auth/wrong-password': 'Senha incorreta.',
+        'auth/invalid-credential': 'E-mail ou senha incorretos.',
+        'auth/too-many-requests': 'Muitas tentativas. Espere um pouco e tente de novo.'
+      };
+      showLoginError(map[err.code] || ('Não foi possível entrar: ' + err.message));
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+    if(!confirm('Sair da sua conta neste aparelho?')) return;
+    await firebase.auth().signOut();
+  });
+
   // ---------- tela de conexão (configurar / trocar o projeto Firebase) ----------
   const setupScreen = document.getElementById('setupScreen');
   const fbConfigInput = document.getElementById('fbConfigInput');
@@ -1330,6 +1402,7 @@
     try{
       localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(config));
       await connectFirebase(config);
+      watchAuth();
       setupScreen.classList.remove('show');
     }catch(err){
       showSetupError('Erro ao conectar: ' + err.message);
@@ -1358,6 +1431,7 @@
     if(saved){
       try{
         await connectFirebase(saved);
+        watchAuth();
       }catch(err){
         openSetup(saved);
         showSetupError('Não foi possível conectar com a configuração salva. Verifique e tente novamente.');
