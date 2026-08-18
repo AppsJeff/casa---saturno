@@ -582,12 +582,12 @@
     <div class="field">
       <label>Configuração do Firebase (firebaseConfig)</label>
       <textarea id="fbConfigInput" style="min-height:150px; font-family:'JetBrains Mono',monospace; font-size:12px;" placeholder='{
-  apiKey: "AIzaSyDUERtfi9gkEGbDWDruSoZdDEs1q0dWOCg",
-  authDomain: "controle-musical---saturno.firebaseapp.com",
-  projectId: "controle-musical---saturno",
-  storageBucket: "controle-musical---saturno.firebasestorage.app",
-  messagingSenderId: "206194227091",
-  appId: "1:206194227091:web:4ff5b332cf65def0541a66"
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
 }'></textarea>
     </div>
     <div id="setupError" style="display:none; color:var(--danger); font-size:12.5px; margin-bottom:10px; line-height:1.4;"></div>
@@ -693,6 +693,23 @@
   // ---------- banco de dados online (Firebase Firestore) ----------
   // Cada lançamento e cada artista é um documento nas coleções "releases" e "artists".
   // A escuta em tempo real (onSnapshot) mantém todos os aparelhos conectados sincronizados sozinhos.
+
+  // >>> ADMINISTRADOR: cole aqui a configuração do SEU projeto Firebase <<<
+  // (Firebase Console → ⚙ Configurações do projeto → seus apps → "SDK setup and configuration")
+  // Depois de preencher e salvar este arquivo, quem abrir o app não precisa mais colar nada —
+  // só aparece a tela de Entrar (e-mail/senha). Deixe como está ("COLE_AQUI...") se ainda
+  // não configurou; nesse caso o app continua pedindo a configuração manualmente.
+  const FIREBASE_CONFIG = {
+    apiKey: "COLE_AQUI_apiKey",
+    authDomain: "COLE_AQUI_authDomain",
+    projectId: "COLE_AQUI_projectId",
+    storageBucket: "COLE_AQUI_storageBucket",
+    messagingSenderId: "COLE_AQUI_messagingSenderId",
+    appId: "COLE_AQUI_appId"
+  };
+  function embeddedConfigIsFilled(){
+    return FIREBASE_CONFIG.apiKey && !String(FIREBASE_CONFIG.apiKey).startsWith('COLE_AQUI');
+  }
   const FB_CONFIG_KEY = 'casaSaturno_firebaseConfig';
   let db = null;
   let unsubReleases = null;
@@ -704,13 +721,19 @@
   }
 
   function parseConfigInput(raw){
-    const match = raw.match(/{[\s\S]*}/);
-    if(!match) throw new Error('Não encontrei um objeto { ... } no texto colado.');
-    let obj;
-    try{ obj = new Function('return (' + match[0] + ')')(); }
-    catch(e){ throw new Error('Não consegui ler essa configuração. Copie exatamente como aparece no Firebase Console.'); }
-    if(!obj || !obj.apiKey || !obj.projectId){
-      throw new Error('Faltam campos obrigatórios (apiKey / projectId) na configuração.');
+    // Extrai cada campo individualmente, tolerando aspas retas ou curvas,
+    // vírgulas ou não, presença ou ausência das chaves { }. Assim, um errinho
+    // de digitação numa chave ou aspas não derruba a leitura inteira.
+    function extractField(text, key){
+      const re = new RegExp(key + '\\s*:\\s*[\'"“”]?\\s*([^\'"“”,\\n}]+)', 'i');
+      const m = text.match(re);
+      return m ? m[1].trim() : null;
+    }
+    const fields = ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'];
+    const obj = {};
+    fields.forEach((f)=>{ const v = extractField(raw, f); if(v) obj[f] = v; });
+    if(!obj.apiKey || !obj.projectId){
+      throw new Error('Não encontrei os campos apiKey e projectId no texto colado. Confira se colou a configuração completa (os 6 campos do Firebase).');
     }
     return obj;
   }
@@ -1428,13 +1451,14 @@
   // ---------- início ----------
   (async function boot(){
     const saved = getSavedConfig();
-    if(saved){
+    const config = saved || (embeddedConfigIsFilled() ? FIREBASE_CONFIG : null);
+    if(config){
       try{
-        await connectFirebase(saved);
+        await connectFirebase(config);
         watchAuth();
       }catch(err){
-        openSetup(saved);
-        showSetupError('Não foi possível conectar com a configuração salva. Verifique e tente novamente.');
+        openSetup(config);
+        showSetupError('Não foi possível conectar. Verifique a configuração e tente novamente.');
       }
     } else {
       openSetup(null);
