@@ -694,18 +694,14 @@
   // Cada lançamento e cada artista é um documento nas coleções "releases" e "artists".
   // A escuta em tempo real (onSnapshot) mantém todos os aparelhos conectados sincronizados sozinhos.
 
-  // >>> ADMINISTRADOR: cole aqui a configuração do SEU projeto Firebase <<<
-  // (Firebase Console → ⚙ Configurações do projeto → seus apps → "SDK setup and configuration")
-  // Depois de preencher e salvar este arquivo, quem abrir o app não precisa mais colar nada —
-  // só aparece a tela de Entrar (e-mail/senha). Deixe como está ("COLE_AQUI...") se ainda
-  // não configurou; nesse caso o app continua pedindo a configuração manualmente.
+  // Configuração do projeto Firebase da Casa Saturno — já preenchida.
   const FIREBASE_CONFIG = {
-    apiKey: "COLE_AQUI_apiKey",
-    authDomain: "COLE_AQUI_authDomain",
-    projectId: "COLE_AQUI_projectId",
-    storageBucket: "COLE_AQUI_storageBucket",
-    messagingSenderId: "COLE_AQUI_messagingSenderId",
-    appId: "COLE_AQUI_appId"
+    apiKey: "AIzaSyDUERtfi9gkEGbDWDruSoZdDEs1q0dWOCg",
+    authDomain: "controle-musical---saturno.firebaseapp.com",
+    projectId: "controle-musical---saturno",
+    storageBucket: "controle-musical---saturno.firebasestorage.app",
+    messagingSenderId: "206194227091",
+    appId: "1:206194227091:web:4ff5b332cf65def0541a66"
   };
   function embeddedConfigIsFilled(){
     return FIREBASE_CONFIG.apiKey && !String(FIREBASE_CONFIG.apiKey).startsWith('COLE_AQUI');
