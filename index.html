@@ -22,6 +22,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --void:#0a0a16;
@@ -396,6 +397,27 @@
 
   .loading{ text-align:center; padding:60px 0; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:13px; }
 
+  /* ===== report view ===== */
+  .report-filters{
+    background:var(--void-2); border:1px solid var(--line); border-radius:14px; padding:14px 14px 6px; margin-bottom:14px;
+  }
+  .report-filters .field{ margin-bottom:12px; }
+  #reportClearFilters{ margin-bottom:10px; }
+  .report-summary{
+    font-size:12.5px; color:var(--text-dim); margin-bottom:10px; font-family:'JetBrains Mono',monospace;
+  }
+  .report-table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:14px; margin-bottom:16px; }
+  table.report-table{ border-collapse:collapse; width:100%; min-width:600px; }
+  table.report-table th{
+    text-align:left; font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--text-dim); background:var(--void-2); padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.report-table td{
+    padding:10px 12px; font-size:13px; border-bottom:1px solid var(--line); color:var(--text); white-space:nowrap;
+  }
+  table.report-table tr:last-child td{ border-bottom:none; }
+  table.report-table tr:nth-child(even){ background:rgba(255,255,255,0.02); }
+
   /* ===== backup bar ===== */
   .backup-row{ display:flex; gap:8px; margin-bottom:16px; }
   .backup-btn{
@@ -439,6 +461,7 @@
     <button id="tab-list" class="active">▤ LANÇAMENTOS</button>
     <button id="tab-cal">◎ CALENDÁRIO</button>
     <button id="tab-artists">✦ ARTISTAS</button>
+    <button id="tab-report">▦ RELATÓRIO</button>
   </div>
 
   <!-- LIST VIEW -->
@@ -473,6 +496,42 @@
   <!-- ARTISTS VIEW -->
   <div id="view-artists" style="display:none;">
     <div id="artistArea"><div class="loading">carregando artistas…</div></div>
+  </div>
+
+  <!-- REPORT VIEW -->
+  <div id="view-report" style="display:none;">
+    <div class="chip-row" id="reportChipRow">
+      <div class="chip active" data-type="all"><span class="dot all"></span>Todos</div>
+      <div class="chip" data-type="Saturno Turbo"><span class="dot Saturno-Turbo"></span>⚡ Saturno Turbo</div>
+      <div class="chip" data-type="Single"><span class="dot Single"></span>🎵 Single</div>
+      <div class="chip" data-type="EP"><span class="dot EP"></span>💿 EP</div>
+      <div class="chip" data-type="Álbum"><span class="dot Álbum"></span>🪐 Álbum</div>
+    </div>
+
+    <div class="report-filters">
+      <div class="field">
+        <label>Artista</label>
+        <select id="reportArtistSelect">
+          <option value="">Todos os artistas</option>
+        </select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>De</label>
+          <input type="date" id="reportDateFrom">
+        </div>
+        <div class="field">
+          <label>Até</label>
+          <input type="date" id="reportDateTo">
+        </div>
+      </div>
+      <button type="button" class="link-btn" id="reportClearFilters">✕ limpar filtros</button>
+    </div>
+
+    <div class="report-summary" id="reportSummary"></div>
+    <div id="reportTableWrap"></div>
+
+    <button type="button" class="day-add-btn" id="reportExportBtn">⬇ Baixar planilha (.xlsx)</button>
   </div>
 </div>
 
@@ -793,6 +852,7 @@
       renderList();
       renderCalendar();
       renderArtists();
+    if(typeof renderReport==='function') renderReport();
     }, (err)=>{
       console.error(err);
       showSetupError('Não foi possível ler os lançamentos: ' + err.message);
@@ -812,6 +872,7 @@
         }catch(e){ /* tenta de novo na próxima sincronização */ }
       }
       renderArtists();
+    if(typeof renderReport==='function') renderReport();
       renderList();
       renderCalendar();
     }, (err)=>{
@@ -981,20 +1042,24 @@
   const tabList = document.getElementById('tab-list');
   const tabCal = document.getElementById('tab-cal');
   const tabArtists = document.getElementById('tab-artists');
+  const tabReport = document.getElementById('tab-report');
   const viewList = document.getElementById('view-list');
   const viewCal = document.getElementById('view-cal');
   const viewArtists = document.getElementById('view-artists');
+  const viewReport = document.getElementById('view-report');
 
   function setActiveTab(tab){
-    [tabList, tabCal, tabArtists].forEach(t=>t.classList.remove('active'));
-    [viewList, viewCal, viewArtists].forEach(v=>v.style.display='none');
+    [tabList, tabCal, tabArtists, tabReport].forEach(t=>t.classList.remove('active'));
+    [viewList, viewCal, viewArtists, viewReport].forEach(v=>v.style.display='none');
     if(tab==='list'){ tabList.classList.add('active'); viewList.style.display=''; }
     if(tab==='cal'){ tabCal.classList.add('active'); viewCal.style.display=''; renderCalendar(); }
     if(tab==='artists'){ tabArtists.classList.add('active'); viewArtists.style.display=''; }
+    if(tab==='report'){ tabReport.classList.add('active'); viewReport.style.display=''; renderReport(); }
   }
   tabList.addEventListener('click', ()=> setActiveTab('list'));
   tabCal.addEventListener('click', ()=> setActiveTab('cal'));
   tabArtists.addEventListener('click', ()=> setActiveTab('artists'));
+  tabReport.addEventListener('click', ()=> setActiveTab('report'));
 
   // Os dois botões de ação ficam sempre visíveis, independente da aba ativa
   document.getElementById('addReleaseBtn').addEventListener('click', ()=> openReleaseAdd());
@@ -1104,6 +1169,110 @@
     currentMonth.setMonth(currentMonth.getMonth()+1);
     selectedDay=null;
     renderCalendar();
+  });
+
+  // ---------- relatório ----------
+  let reportType = 'all';
+  let reportArtistId = '';
+  const reportChipRow = document.getElementById('reportChipRow');
+  const reportArtistSelect = document.getElementById('reportArtistSelect');
+  const reportDateFrom = document.getElementById('reportDateFrom');
+  const reportDateTo = document.getElementById('reportDateTo');
+  const reportSummary = document.getElementById('reportSummary');
+  const reportTableWrap = document.getElementById('reportTableWrap');
+
+  function populateReportArtistSelect(){
+    const sorted = [...artists].sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+    const prev = reportArtistSelect.value;
+    reportArtistSelect.innerHTML = '<option value="">Todos os artistas</option>' +
+      sorted.map(a=>`<option value="${a.id}">${escapeHtml(a.nome)}</option>`).join('');
+    reportArtistSelect.value = sorted.some(a=>a.id===prev) ? prev : '';
+  }
+
+  function getReportFiltered(){
+    let list = [...releases];
+    if(reportType !== 'all') list = list.filter(r=>r.tipo===reportType);
+    if(reportArtistId) list = list.filter(r=>releaseArtistIds(r).includes(reportArtistId));
+    if(reportDateFrom.value) list = list.filter(r=> r.data && r.data >= reportDateFrom.value);
+    if(reportDateTo.value) list = list.filter(r=> r.data && r.data <= reportDateTo.value);
+    return sortedReleases(list);
+  }
+
+  function renderReport(){
+    populateReportArtistSelect();
+    const filtered = getReportFiltered();
+    reportSummary.textContent = `${filtered.length} lançamento${filtered.length===1?'':'s'} encontrado${filtered.length===1?'':'s'}`;
+
+    if(filtered.length===0){
+      reportTableWrap.innerHTML = `<div class="empty">
+        <div class="glyph">▦</div>
+        <h3>NENHUM RESULTADO</h3>
+        <p>Ajuste os filtros acima para ver lançamentos aqui.</p>
+      </div>`;
+      return;
+    }
+
+    reportTableWrap.innerHTML = `<div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>Artista(s)</th><th>Título</th><th>Tipo</th><th>Status</th><th>Data</th><th>Master</th><th>Clipe</th>
+      </tr></thead>
+      <tbody>${filtered.map(r=>`<tr>
+        <td>${escapeHtml(getArtistNames(r))}</td>
+        <td>${escapeHtml(r.titulo||'')}</td>
+        <td>${escapeHtml(r.tipo||'Sem tipo')}</td>
+        <td>${escapeHtml(r.status||'')}</td>
+        <td>${fmtDate(r.data)}</td>
+        <td>${r.masterData ? fmtDate(r.masterData) : '—'}</td>
+        <td>${r.clipeData ? fmtDate(r.clipeData) : '—'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
+  reportChipRow.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    reportChipRow.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportType = chip.dataset.type;
+    renderReport();
+  });
+  reportArtistSelect.addEventListener('change', ()=>{ reportArtistId = reportArtistSelect.value; renderReport(); });
+  reportDateFrom.addEventListener('change', renderReport);
+  reportDateTo.addEventListener('change', renderReport);
+  document.getElementById('reportClearFilters').addEventListener('click', ()=>{
+    reportType = 'all';
+    reportArtistId = '';
+    reportChipRow.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.dataset.type==='all'));
+    reportArtistSelect.value = '';
+    reportDateFrom.value = '';
+    reportDateTo.value = '';
+    renderReport();
+  });
+
+  document.getElementById('reportExportBtn').addEventListener('click', ()=>{
+    const filtered = getReportFiltered();
+    if(filtered.length===0){ alert('Não há lançamentos para exportar com esses filtros.'); return; }
+    if(typeof XLSX === 'undefined'){ alert('A biblioteca de planilha não carregou. Verifique sua conexão e tente de novo.'); return; }
+    const rows = filtered.map(r=>({
+      'Artista(s)': getArtistNames(r),
+      'Título': r.titulo || '',
+      'Tipo': r.tipo || 'Sem tipo',
+      'Status': r.status || '',
+      'Data de Lançamento': r.data || '',
+      'Entrega do Master': r.masterData || '',
+      'Entrega do Clipe': r.clipeData || '',
+      'Gênero': r.genero || '',
+      'ISRC': r.isrc || '',
+      'UPC/EAN': r.upc || '',
+      'Distribuidora': r.distribuidora || '',
+      'Responsável': r.responsavel || '',
+      'Observações': r.obs || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lançamentos');
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `relatorio-casa-saturno-${stamp}.xlsx`);
   });
 
   // ---------- release modal / form ----------
@@ -1288,6 +1457,7 @@
     renderList();
     renderCalendar();
     renderArtists();
+    if(typeof renderReport==='function') renderReport();
   });
 
   deleteBtn.addEventListener('click', async ()=>{
@@ -1299,6 +1469,7 @@
     renderList();
     renderCalendar();
     renderArtists();
+    if(typeof renderReport==='function') renderReport();
   });
 
   // ---------- artist modal / form ----------
@@ -1391,6 +1562,7 @@
     if(idx>=0) artists[idx] = data; else artists.push(data);
     await writeArtist(data);
     renderArtists();
+    if(typeof renderReport==='function') renderReport();
 
     const wasStacked = pendingReturnToRelease;
     overlayArtist.classList.remove('show');
@@ -1420,6 +1592,7 @@
     await deleteArtistDoc(id);
     closeArtistModal();
     renderArtists();
+    if(typeof renderReport==='function') renderReport();
     renderList();
     renderCalendar();
   });
