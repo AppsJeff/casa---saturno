@@ -285,6 +285,19 @@
   .type-opt.sel[data-type="Single"]{ background:rgba(255,62,165,0.15); border-color:var(--magenta); color:var(--magenta); }
   .type-opt.sel[data-type="EP"]{ background:rgba(62,239,255,0.15); border-color:var(--cyan); color:var(--cyan); }
   .type-opt.sel[data-type="Álbum"]{ background:rgba(155,92,255,0.18); border-color:var(--violet); color:#c9aeff; }
+  .status-list{ display:flex; flex-direction:column; gap:8px; }
+  .status-opt{
+    display:flex; align-items:center; gap:11px; padding:11px 13px; border:1px solid var(--line);
+    border-radius:10px; background:var(--void); cursor:pointer; font-weight:600; font-size:14px; color:var(--text-dim);
+    transition:all .12s ease;
+  }
+  .status-opt .box{
+    width:19px; height:19px; border-radius:6px; border:2px solid var(--line); flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; font-size:12px; color:transparent; font-weight:900;
+  }
+  .status-opt.sel{ border-color:var(--cyan); color:var(--text); background:rgba(62,239,255,0.08); }
+  .status-opt.sel .box{ background:var(--cyan); border-color:var(--cyan); color:#0a0a16; }
+  .status-opt.sel .box::after{ content:'✓'; }
   .color-picker{ display:grid; grid-template-columns:repeat(7,1fr); gap:10px; padding:4px 2px; }
   .swatch{
     width:100%; aspect-ratio:1/1; border-radius:50%; cursor:pointer; border:2px solid transparent;
@@ -450,6 +463,7 @@
 <div class="overlay" id="overlay">
   <div class="modal">
     <h2><span id="modalTitle">Novo Lançamento</span><span class="close" id="closeModal">×</span></h2>
+    <div id="editMeta" style="display:none; font-size:11.5px; color:var(--text-dim); margin:-8px 0 14px; line-height:1.4;"></div>
 
     <div id="noArtistWarn" class="artist-warn" style="display:none;">
       Nenhum artista cadastrado ainda. Cadastre o artista primeiro para poder vinculá-lo a um lançamento.
@@ -474,6 +488,17 @@
         <input type="date" id="fData" required>
       </div>
 
+      <div class="row2">
+        <div class="field">
+          <label>Entrega do master <span class="opt">(opcional)</span></label>
+          <input type="date" id="fMasterData">
+        </div>
+        <div class="field">
+          <label>Entrega do clipe <span class="opt">(opcional)</span></label>
+          <input type="date" id="fClipeData">
+        </div>
+      </div>
+
       <div class="field">
         <label>Tipo de lançamento <span class="opt">(opcional)</span></label>
         <div class="type-select" id="typeSelect">
@@ -484,34 +509,25 @@
         </div>
       </div>
 
-      <div class="row2">
-        <div class="field">
-          <label>Status <span class="opt">(opcional)</span></label>
-          <select id="fStatus">
-            <option>Planejado</option>
-            <option>Em produção</option>
-            <option>Masterização</option>
-            <option>Pronto para lançar</option>
-            <option>Lançado</option>
-            <option>Adiado</option>
-            <option>Cancelado</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Gênero <span class="opt">(opcional)</span></label>
-          <input type="text" id="fGenero" placeholder="Synth-pop">
-        </div>
+      <div class="field">
+        <label>Status <span class="opt">— obrigatório</span></label>
+        <div class="status-list" id="statusList"></div>
       </div>
 
       <div class="row2">
         <div class="field">
+          <label>Gênero <span class="opt">(opcional)</span></label>
+          <input type="text" id="fGenero" placeholder="Synth-pop">
+        </div>
+        <div class="field">
           <label>Responsável <span class="opt">(opcional)</span></label>
           <input type="text" id="fResp" placeholder="Marina">
         </div>
-        <div class="field">
-          <label>Distribuidora <span class="opt">(opcional)</span></label>
-          <input type="text" id="fDistrib" placeholder="Distro Digital">
-        </div>
+      </div>
+
+      <div class="field">
+        <label>Distribuidora <span class="opt">(opcional)</span></label>
+        <input type="text" id="fDistrib" placeholder="Distro Digital">
       </div>
 
       <div class="row2">
@@ -601,6 +617,7 @@
 <div class="overlay" id="overlayArtist">
   <div class="modal">
     <h2><span id="artistModalTitle">Novo Artista</span><span class="close" id="closeArtistModal">×</span></h2>
+    <div id="editMetaArtist" style="display:none; font-size:11.5px; color:var(--text-dim); margin:-8px 0 14px; line-height:1.4;"></div>
     <form id="artistForm">
       <input type="hidden" id="artistId">
 
@@ -655,12 +672,13 @@
   const TYPE_ICON = {
     "Saturno Turbo": "⚡", "Single": "🎵", "EP": "💿", "Álbum": "🪐"
   };
+  const STATUS_LIST = ["Na fila","Planejado","Em produção","Masterização","Pronto para lançar","Lançado","Adiado","Cancelado"];
   const STATUS_STAGE = {
-    "Planejado": 12, "Em produção": 35, "Masterização": 58,
+    "Na fila": 5, "Planejado": 12, "Em produção": 35, "Masterização": 58,
     "Pronto para lançar": 80, "Lançado": 100, "Adiado": 100, "Cancelado": 100
   };
   const STATUS_COLOR = {
-    "Planejado":"var(--text-dim)", "Em produção":"var(--warn)", "Masterização":"var(--warn)",
+    "Na fila":"var(--text-dim)", "Planejado":"var(--text-dim)", "Em produção":"var(--warn)", "Masterização":"var(--warn)",
     "Pronto para lançar":"var(--cyan)", "Lançado":"var(--success)",
     "Adiado":"var(--danger)", "Cancelado":"var(--danger)"
   };
@@ -855,6 +873,8 @@
         <div class="card-meta">
           <span class="type-pill" style="background:${typeColor}22; color:${typeColor}">${typeIcon} ${typeLabel}</span>
           <span class="date-tag">${fmtDate(r.data)}</span>
+          ${r.masterData ? `<span class="date-tag">🎚 Master ${fmtDate(r.masterData)}</span>` : ''}
+          ${r.clipeData ? `<span class="date-tag">🎬 Clipe ${fmtDate(r.clipeData)}</span>` : ''}
           <span class="status-pill" style="background:${ringColor}18; color:${ringColor}">
             <span class="ring" style="--pct:${pct}; --ring-color:${ringColor}"></span>
             ${r.status}
@@ -1033,8 +1053,32 @@
   // ---------- release modal / form ----------
   const form = document.getElementById('releaseForm');
   const modalTitle = document.getElementById('modalTitle');
+  const editMeta = document.getElementById('editMeta');
   const deleteBtn = document.getElementById('deleteBtn');
   const noArtistWarn = document.getElementById('noArtistWarn');
+  const statusList = document.getElementById('statusList');
+  let formStatus = 'Na fila';
+
+  function renderStatusList(){
+    statusList.innerHTML = STATUS_LIST.map((s)=>{
+      const sel = formStatus === s;
+      return `<div class="status-opt ${sel?'sel':''}" data-status="${s}"><span class="box"></span>${s}</div>`;
+    }).join('');
+    statusList.querySelectorAll('.status-opt').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        formStatus = el.dataset.status;
+        renderStatusList();
+      });
+    });
+  }
+
+  function fmtDateTime(iso){
+    if(!iso) return '';
+    try{
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    }catch(e){ return ''; }
+  }
 
   function renderArtistPicker(){
     if(artists.length===0){
@@ -1079,6 +1123,9 @@
     typeSelect.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('sel'));
     deleteBtn.style.display='none';
     modalTitle.textContent='Novo Lançamento';
+    editMeta.style.display='none';
+    formStatus = 'Na fila';
+    renderStatusList();
     selectedArtistIds = new Set();
     renderArtistPicker();
   }
@@ -1106,7 +1153,10 @@
     renderArtistPicker();
     document.getElementById('fTitulo').value = r.titulo||'';
     document.getElementById('fData').value = r.data||'';
-    document.getElementById('fStatus').value = r.status||'Planejado';
+    document.getElementById('fMasterData').value = r.masterData||'';
+    document.getElementById('fClipeData').value = r.clipeData||'';
+    formStatus = r.status || 'Na fila';
+    renderStatusList();
     document.getElementById('fGenero').value = r.genero||'';
     document.getElementById('fResp').value = r.responsavel||'';
     document.getElementById('fIsrc').value = r.isrc||'';
@@ -1120,6 +1170,12 @@
       o.classList.toggle('sel', !!r.tipo && o.dataset.type===r.tipo);
     });
     modalTitle.textContent = 'Editar Lançamento';
+    if(r.atualizadoPor){
+      editMeta.style.display = '';
+      editMeta.textContent = `Última edição: ${r.atualizadoPor}${r.atualizadoEm ? ' em ' + fmtDateTime(r.atualizadoEm) : ''}`;
+    } else {
+      editMeta.style.display = 'none';
+    }
     deleteBtn.style.display='';
     deleteBtn.dataset.id = r.id;
     overlay.classList.add('show');
@@ -1143,13 +1199,18 @@
     if(!dataLanc){ alert('Informe a data de lançamento.'); return; }
 
     const id = document.getElementById('releaseId').value || ('r' + Date.now() + Math.random().toString(36).slice(2,7));
+    const existing = releases.find(r=>r.id===id);
+    const currentEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconhecido';
+    const nowIso = new Date().toISOString();
     const data = {
       id,
       tipo: formType || '',
       artistaIds: Array.from(selectedArtistIds),
       titulo,
       data: dataLanc,
-      status: document.getElementById('fStatus').value,
+      masterData: document.getElementById('fMasterData').value,
+      clipeData: document.getElementById('fClipeData').value,
+      status: formStatus,
       genero: document.getElementById('fGenero').value.trim(),
       responsavel: document.getElementById('fResp').value.trim(),
       isrc: document.getElementById('fIsrc').value.trim(),
@@ -1158,6 +1219,10 @@
       spotify: document.getElementById('fSpotify').value.trim(),
       youtube: document.getElementById('fYoutube').value.trim(),
       obs: document.getElementById('fObs').value.trim(),
+      criadoPor: (existing && existing.criadoPor) ? existing.criadoPor : currentEmail,
+      criadoEm: (existing && existing.criadoEm) ? existing.criadoEm : nowIso,
+      atualizadoPor: currentEmail,
+      atualizadoEm: nowIso,
     };
     const idx = releases.findIndex(r=>r.id===id);
     if(idx>=0) releases[idx] = data; else releases.push(data);
@@ -1182,6 +1247,7 @@
   // ---------- artist modal / form ----------
   const artistForm = document.getElementById('artistForm');
   const artistModalTitle = document.getElementById('artistModalTitle');
+  const editMetaArtist = document.getElementById('editMetaArtist');
   const deleteArtistBtn = document.getElementById('deleteArtistBtn');
 
   function renderColorPicker(){
@@ -1202,6 +1268,7 @@
     document.getElementById('artistId').value='';
     deleteArtistBtn.style.display='none';
     artistModalTitle.textContent='Novo Artista';
+    editMetaArtist.style.display='none';
     selectedColor = nextSuggestedColor();
     renderColorPicker();
   }
@@ -1226,6 +1293,10 @@
     selectedColor = a.cor || nextSuggestedColor();
     renderColorPicker();
     artistModalTitle.textContent = 'Editar Artista';
+    if(a.atualizadoPor){
+      editMetaArtist.style.display = '';
+      editMetaArtist.textContent = `Última edição: ${a.atualizadoPor}${a.atualizadoEm ? ' em ' + fmtDateTime(a.atualizadoEm) : ''}`;
+    }
     deleteArtistBtn.style.display='';
     deleteArtistBtn.dataset.id = a.id;
     overlayArtist.classList.add('show');
@@ -1243,6 +1314,9 @@
   artistForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const id = document.getElementById('artistId').value || ('a' + Date.now() + Math.random().toString(36).slice(2,7));
+    const existingArtist = artists.find(a=>a.id===id);
+    const currentEmailA = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconhecido';
+    const nowIsoA = new Date().toISOString();
     const data = {
       id,
       nome: document.getElementById('aNome').value.trim(),
@@ -1251,6 +1325,10 @@
       contato: document.getElementById('aContato').value.trim(),
       redes: document.getElementById('aRedes').value.trim(),
       obs: document.getElementById('aObs').value.trim(),
+      criadoPor: (existingArtist && existingArtist.criadoPor) ? existingArtist.criadoPor : currentEmailA,
+      criadoEm: (existingArtist && existingArtist.criadoEm) ? existingArtist.criadoEm : nowIsoA,
+      atualizadoPor: currentEmailA,
+      atualizadoEm: nowIsoA,
     };
     const idx = artists.findIndex(a=>a.id===id);
     if(idx>=0) artists[idx] = data; else artists.push(data);
