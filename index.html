@@ -418,6 +418,31 @@
   table.report-table tr:last-child td{ border-bottom:none; }
   table.report-table tr:nth-child(even){ background:rgba(255,255,255,0.02); }
 
+  /* ===== chronogram (cronograma) ===== */
+  .chrono-scroll{
+    overflow-x:auto; overflow-y:hidden; border:1px solid var(--line); border-radius:14px;
+    background:var(--void-2); margin-bottom:14px; -webkit-overflow-scrolling:touch;
+  }
+  .chrono-row{ display:flex; align-items:center; border-bottom:1px solid var(--line); cursor:pointer; }
+  .chrono-row:last-child{ border-bottom:none; }
+  .chrono-row:active{ background:rgba(255,255,255,0.03); }
+  .chrono-label{
+    position:sticky; left:0; z-index:4; background:var(--void-2); width:168px; flex:0 0 168px;
+    padding:10px 12px; border-right:1px solid var(--line); overflow:hidden;
+  }
+  .chrono-label b{ display:block; font-size:12.5px; color:var(--text); font-family:'Orbitron',sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chrono-label span{ display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chrono-lane{ position:relative; height:52px; flex:0 0 auto; }
+  .chrono-bar{ position:absolute; top:50%; height:5px; border-radius:4px; transform:translateY(-50%); }
+  .chrono-marker{
+    position:absolute; top:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:10.5px; border:2px solid var(--void-2);
+  }
+  .chrono-today-line{ position:absolute; top:0; bottom:0; width:2px; background:var(--cyan); box-shadow:0 0 6px var(--cyan); z-index:6; }
+  .chrono-legend{
+    display:flex; gap:14px; flex-wrap:wrap; margin-top:4px; font-size:11.5px; color:var(--text-dim);
+  }
+
   /* ===== backup bar ===== */
   .backup-row{ display:flex; gap:8px; margin-bottom:16px; }
   .backup-btn{
@@ -462,6 +487,7 @@
     <button id="tab-cal">◎ CALENDÁRIO</button>
     <button id="tab-artists">✦ ARTISTAS</button>
     <button id="tab-report">▦ RELATÓRIO</button>
+    <button id="tab-chrono">🗓 CRONOGRAMA</button>
   </div>
 
   <!-- LIST VIEW -->
@@ -532,6 +558,24 @@
     <div id="reportTableWrap"></div>
 
     <button type="button" class="day-add-btn" id="reportExportBtn">⬇ Baixar planilha (.xlsx)</button>
+  </div>
+
+  <!-- CHRONOGRAM VIEW -->
+  <div id="view-chrono" style="display:none;">
+    <div class="chip-row" id="chronoChipRow">
+      <div class="chip active" data-type="all"><span class="dot all"></span>Todos</div>
+      <div class="chip" data-type="Saturno Turbo"><span class="dot Saturno-Turbo"></span>⚡ Saturno Turbo</div>
+      <div class="chip" data-type="Single"><span class="dot Single"></span>🎵 Single</div>
+      <div class="chip" data-type="EP"><span class="dot EP"></span>💿 EP</div>
+      <div class="chip" data-type="Álbum"><span class="dot Álbum"></span>🪐 Álbum</div>
+    </div>
+    <div id="chronoWrap"></div>
+    <div class="chrono-legend">
+      <span>🎚 Entrega do master</span>
+      <span>🎬 Entrega do clipe</span>
+      <span>● Lançamento <i style="color:var(--text-dim)">(cor = status)</i></span>
+      <span style="color:var(--cyan);">┃ Hoje</span>
+    </div>
   </div>
 </div>
 
@@ -853,6 +897,7 @@
       renderCalendar();
       renderArtists();
     if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
     }, (err)=>{
       console.error(err);
       showSetupError('Não foi possível ler os lançamentos: ' + err.message);
@@ -873,6 +918,7 @@
       }
       renderArtists();
     if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
       renderList();
       renderCalendar();
     }, (err)=>{
@@ -1043,23 +1089,27 @@
   const tabCal = document.getElementById('tab-cal');
   const tabArtists = document.getElementById('tab-artists');
   const tabReport = document.getElementById('tab-report');
+  const tabChrono = document.getElementById('tab-chrono');
   const viewList = document.getElementById('view-list');
   const viewCal = document.getElementById('view-cal');
   const viewArtists = document.getElementById('view-artists');
   const viewReport = document.getElementById('view-report');
+  const viewChrono = document.getElementById('view-chrono');
 
   function setActiveTab(tab){
-    [tabList, tabCal, tabArtists, tabReport].forEach(t=>t.classList.remove('active'));
-    [viewList, viewCal, viewArtists, viewReport].forEach(v=>v.style.display='none');
+    [tabList, tabCal, tabArtists, tabReport, tabChrono].forEach(t=>t.classList.remove('active'));
+    [viewList, viewCal, viewArtists, viewReport, viewChrono].forEach(v=>v.style.display='none');
     if(tab==='list'){ tabList.classList.add('active'); viewList.style.display=''; }
     if(tab==='cal'){ tabCal.classList.add('active'); viewCal.style.display=''; renderCalendar(); }
     if(tab==='artists'){ tabArtists.classList.add('active'); viewArtists.style.display=''; }
     if(tab==='report'){ tabReport.classList.add('active'); viewReport.style.display=''; renderReport(); }
+    if(tab==='chrono'){ tabChrono.classList.add('active'); viewChrono.style.display=''; renderChrono(); }
   }
   tabList.addEventListener('click', ()=> setActiveTab('list'));
   tabCal.addEventListener('click', ()=> setActiveTab('cal'));
   tabArtists.addEventListener('click', ()=> setActiveTab('artists'));
   tabReport.addEventListener('click', ()=> setActiveTab('report'));
+  tabChrono.addEventListener('click', ()=> setActiveTab('chrono'));
 
   // Os dois botões de ação ficam sempre visíveis, independente da aba ativa
   document.getElementById('addReleaseBtn').addEventListener('click', ()=> openReleaseAdd());
@@ -1275,6 +1325,113 @@
     XLSX.writeFile(wb, `relatorio-casa-saturno-${stamp}.xlsx`);
   });
 
+  // ---------- cronograma ----------
+  const CHRONO_PX_PER_DAY = 14;
+  const CHRONO_LABEL_WIDTH = 168;
+  let chronoType = 'all';
+  const chronoChipRow = document.getElementById('chronoChipRow');
+  const chronoWrap = document.getElementById('chronoWrap');
+
+  function isoToTime(iso){ return new Date(iso + 'T00:00:00').getTime(); }
+
+  function computeChronoRange(list){
+    let min = null, max = null;
+    list.forEach(r=>{
+      [r.masterData, r.clipeData, r.data].forEach(d=>{
+        if(!d) return;
+        const t = isoToTime(d);
+        if(min===null || t<min) min = t;
+        if(max===null || t>max) max = t;
+      });
+    });
+    const todayT = isoToTime(new Date().toISOString().slice(0,10));
+    if(min===null){ min = todayT - 14*86400000; max = todayT + 60*86400000; }
+    min -= 7*86400000;
+    max += 7*86400000;
+    const minDate = new Date(min);
+    const dow = minDate.getDay();
+    const diffToMonday = (dow===0 ? 6 : dow-1);
+    minDate.setHours(0,0,0,0);
+    minDate.setDate(minDate.getDate() - diffToMonday);
+    return { min: minDate.getTime(), max };
+  }
+
+  function renderChrono(){
+    let list = releases.filter(r=>r.data);
+    if(chronoType !== 'all') list = list.filter(r=>r.tipo===chronoType);
+    list = sortedReleases(list);
+
+    if(list.length===0){
+      chronoWrap.innerHTML = `<div class="empty">
+        <div class="glyph">🗓</div>
+        <h3>NADA PARA MOSTRAR AQUI</h3>
+        <p>Cadastre lançamentos com data para ver o cronograma.</p>
+      </div>`;
+      return;
+    }
+
+    const range = computeChronoRange(list);
+    const totalDays = Math.max(7, Math.ceil((range.max - range.min) / 86400000));
+    const totalWidth = totalDays * CHRONO_PX_PER_DAY;
+
+    function xPos(iso){
+      return Math.max(0, (isoToTime(iso) - range.min) / 86400000 * CHRONO_PX_PER_DAY);
+    }
+
+    let ticks = '';
+    for(let t = range.min; t <= range.max; t += 7*86400000){
+      const left = (t - range.min) / 86400000 * CHRONO_PX_PER_DAY;
+      const label = new Date(t).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+      ticks += `<div style="position:absolute; left:${left}px; top:0; bottom:0; border-left:1px dashed var(--line); font-size:10px; color:var(--text-dim); padding:6px 0 0 4px; font-family:'JetBrains Mono',monospace; white-space:nowrap;">${label}</div>`;
+    }
+
+    const todayIso = new Date().toISOString().slice(0,10);
+    const todayX = xPos(todayIso);
+    const todayLine = `<div class="chrono-today-line" style="left:${CHRONO_LABEL_WIDTH + todayX}px;" title="Hoje"></div>`;
+
+    const rowsHtml = list.map(r=>{
+      const ringColor = STATUS_COLOR[r.status] ?? 'var(--text-dim)';
+      const endX = xPos(r.data);
+      const startCandidates = [r.masterData, r.clipeData, r.data].filter(Boolean).map(xPos);
+      const startX = Math.min(...startCandidates);
+      const barLeft = Math.min(startX, endX);
+      const barWidth = Math.max(6, Math.abs(endX - startX));
+      let markers = '';
+      if(r.masterData) markers += `<div class="chrono-marker" style="left:${xPos(r.masterData)}px; background:var(--warn);" title="Master: ${fmtDate(r.masterData)}">🎚</div>`;
+      if(r.clipeData) markers += `<div class="chrono-marker" style="left:${xPos(r.clipeData)}px; background:var(--cyan);" title="Clipe: ${fmtDate(r.clipeData)}">🎬</div>`;
+      markers += `<div class="chrono-marker" style="left:${endX}px; background:${ringColor}; color:#0a0a16;" title="Lançamento: ${fmtDate(r.data)}">●</div>`;
+      return `<div class="chrono-row" data-id="${r.id}">
+        <div class="chrono-label"><b>${escapeHtml(getArtistNames(r))}</b><span>${escapeHtml(r.titulo||'')}</span></div>
+        <div class="chrono-lane" style="width:${totalWidth}px;">
+          <div class="chrono-bar" style="left:${barLeft}px; width:${barWidth}px; background:${ringColor}66;"></div>
+          ${markers}
+        </div>
+      </div>`;
+    }).join('');
+
+    chronoWrap.innerHTML = `<div class="chrono-scroll"><div style="position:relative;">
+      ${todayLine}
+      <div class="chrono-row" style="border-bottom:1px solid var(--line);">
+        <div class="chrono-label" style="font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:.5px; color:var(--text-dim); text-transform:uppercase;">Lançamentos</div>
+        <div class="chrono-lane" style="width:${totalWidth}px; height:34px;">${ticks}</div>
+      </div>
+      ${rowsHtml}
+    </div></div>`;
+
+    chronoWrap.querySelectorAll('.chrono-row[data-id]').forEach(el=>{
+      el.addEventListener('click', ()=> openEdit(el.dataset.id));
+    });
+  }
+
+  chronoChipRow.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    chronoChipRow.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    chronoType = chip.dataset.type;
+    renderChrono();
+  });
+
   // ---------- release modal / form ----------
   const form = document.getElementById('releaseForm');
   const modalTitle = document.getElementById('modalTitle');
@@ -1458,6 +1615,7 @@
     renderCalendar();
     renderArtists();
     if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
   });
 
   deleteBtn.addEventListener('click', async ()=>{
@@ -1470,6 +1628,7 @@
     renderCalendar();
     renderArtists();
     if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
   });
 
   // ---------- artist modal / form ----------
@@ -1563,6 +1722,7 @@
     await writeArtist(data);
     renderArtists();
     if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
 
     const wasStacked = pendingReturnToRelease;
     overlayArtist.classList.remove('show');
@@ -1593,6 +1753,7 @@
     closeArtistModal();
     renderArtists();
     if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
     renderList();
     renderCalendar();
   });
