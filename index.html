@@ -459,6 +459,13 @@
     border-radius:100px; padding:6px 12px; margin-bottom:14px; font-family:'Orbitron',sans-serif;
   }
   .offline-pill.show{ display:flex; }
+  .readonly-pill{
+    display:none; align-items:center; gap:6px; justify-content:center;
+    font-size:11px; font-weight:700; letter-spacing:.5px; color:#c9aeff;
+    background:rgba(155,92,255,0.12); border:1px solid rgba(155,92,255,0.35);
+    border-radius:100px; padding:6px 12px; margin-bottom:14px; font-family:'Orbitron',sans-serif;
+  }
+  .readonly-pill.show{ display:flex; }
 </style>
 </head>
 <body>
@@ -473,6 +480,7 @@
   </header>
 
   <div class="offline-pill" id="offlinePill">● MODO OFFLINE — os dados continuam salvos neste aparelho</div>
+  <div class="readonly-pill" id="readonlyPill">🔒 MODO SOMENTE LEITURA</div>
 
   <div class="backup-row">
     <button class="backup-btn" id="exportBtn">☁ Exportar backup</button>
@@ -780,7 +788,7 @@
       <div class="modal-actions">
         <button type="button" class="btn danger" id="deleteArtistBtn" style="display:none;">Excluir</button>
         <button type="button" class="btn ghost" id="cancelArtistBtn">Cancelar</button>
-        <button type="submit" class="btn primary cyan">Salvar</button>
+        <button type="submit" class="btn primary cyan" id="saveArtistBtn">Salvar</button>
       </div>
     </form>
   </div>
@@ -1066,7 +1074,7 @@
           </div>
         </div>
         <div class="card-actions">
-          <button type="button" class="mini-action-btn" data-action="edit" data-id="${a.id}">✏️ Editar</button>
+          <button type="button" class="mini-action-btn" data-action="edit" data-id="${a.id}">${isEditor ? '✏️ Editar' : '👁 Ver'}</button>
           <button type="button" class="mini-action-btn" data-action="filter" data-id="${a.id}">🎧 ${count} lançamento${count===1?'':'s'}</button>
         </div>
       </div>`;
@@ -1199,12 +1207,13 @@
         </div>
       </div>`;
     }).join('');
-    const addBtn = `<button type="button" class="day-add-btn" id="addOnDayBtn">＋ Adicionar lançamento em ${fmtDate(iso)}</button>`;
+    const addBtn = isEditor ? `<button type="button" class="day-add-btn" id="addOnDayBtn">＋ Adicionar lançamento em ${fmtDate(iso)}</button>` : '';
     dayPanel.innerHTML = header + list + addBtn;
     dayPanel.querySelectorAll('.mini-card').forEach(el=>{
       el.addEventListener('click', ()=> openEdit(el.dataset.id));
     });
-    document.getElementById('addOnDayBtn').addEventListener('click', ()=> openReleaseAdd(iso));
+    const addOnDayBtn = document.getElementById('addOnDayBtn');
+    if(addOnDayBtn) addOnDayBtn.addEventListener('click', ()=> openReleaseAdd(iso));
     requestAnimationFrame(()=>{
       dayPanel.scrollIntoView({behavior:'smooth', block:'nearest'});
     });
@@ -1437,6 +1446,8 @@
   const modalTitle = document.getElementById('modalTitle');
   const editMeta = document.getElementById('editMeta');
   const deleteBtn = document.getElementById('deleteBtn');
+  const saveReleaseBtn = document.getElementById('saveReleaseBtn');
+  const quickAddArtistBtn = document.getElementById('quickAddArtist');
   const noArtistWarn = document.getElementById('noArtistWarn');
   const statusList = document.getElementById('statusList');
   let formStatus = 'Na fila';
@@ -1506,6 +1517,8 @@
     deleteBtn.style.display='none';
     modalTitle.textContent='Novo Lançamento';
     editMeta.style.display='none';
+    saveReleaseBtn.style.display='';
+    quickAddArtistBtn.style.display='';
     formStatus = 'Na fila';
     renderStatusList();
     selectedArtistIds = new Set();
@@ -1559,8 +1572,10 @@
     } else {
       editMeta.style.display = 'none';
     }
-    deleteBtn.style.display='';
+    deleteBtn.style.display = isEditor ? '' : 'none';
     deleteBtn.dataset.id = r.id;
+    saveReleaseBtn.style.display = isEditor ? '' : 'none';
+    quickAddArtistBtn.style.display = isEditor ? '' : 'none';
     overlay.classList.add('show');
   }
 
@@ -1575,6 +1590,7 @@
 
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode salvar alterações.'); return; }
     if(selectedArtistIds.size===0){ alert('Selecione ao menos um artista já cadastrado (ou cadastre um novo).'); return; }
     const titulo = document.getElementById('fTitulo').value.trim();
     const dataLanc = document.getElementById('fData').value;
@@ -1619,6 +1635,7 @@
   });
 
   deleteBtn.addEventListener('click', async ()=>{
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode excluir.'); return; }
     const id = deleteBtn.dataset.id;
     if(!confirm('Excluir este lançamento?')) return;
     releases = releases.filter(r=>r.id!==id);
@@ -1636,6 +1653,7 @@
   const artistModalTitle = document.getElementById('artistModalTitle');
   const editMetaArtist = document.getElementById('editMetaArtist');
   const deleteArtistBtn = document.getElementById('deleteArtistBtn');
+  const saveArtistBtn = document.getElementById('saveArtistBtn');
 
   function renderColorPicker(){
     colorPicker.innerHTML = COLOR_PALETTE.map(c=>{
@@ -1656,6 +1674,7 @@
     deleteArtistBtn.style.display='none';
     artistModalTitle.textContent='Novo Artista';
     editMetaArtist.style.display='none';
+    saveArtistBtn.style.display='';
     selectedColor = nextSuggestedColor();
     renderColorPicker();
   }
@@ -1684,8 +1703,9 @@
       editMetaArtist.style.display = '';
       editMetaArtist.textContent = `Última edição: ${a.atualizadoPor}${a.atualizadoEm ? ' em ' + fmtDateTime(a.atualizadoEm) : ''}`;
     }
-    deleteArtistBtn.style.display='';
+    deleteArtistBtn.style.display = isEditor ? '' : 'none';
     deleteArtistBtn.dataset.id = a.id;
+    saveArtistBtn.style.display = isEditor ? '' : 'none';
     overlayArtist.classList.add('show');
   }
 
@@ -1700,6 +1720,7 @@
 
   artistForm.addEventListener('submit', async (e)=>{
     e.preventDefault();
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode salvar alterações.'); return; }
     const id = document.getElementById('artistId').value || ('a' + Date.now() + Math.random().toString(36).slice(2,7));
     const existingArtist = artists.find(a=>a.id===id);
     const currentEmailA = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconhecido';
@@ -1742,6 +1763,7 @@
   });
 
   deleteArtistBtn.addEventListener('click', async ()=>{
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode excluir.'); return; }
     const id = deleteArtistBtn.dataset.id;
     const linked = releases.filter(r=>releaseArtistIds(r).includes(id)).length;
     const msg = linked>0
@@ -1824,13 +1846,41 @@
     loginError.style.display = '';
   }
 
+  let isEditor = false;
+  const readonlyPill = document.getElementById('readonlyPill');
+
+  async function checkRole(){
+    isEditor = false;
+    try{
+      const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+      if(uid){
+        const snap = await db.collection('roles').doc(uid).get();
+        isEditor = snap.exists && snap.data().role === 'edicao';
+      }
+    }catch(e){
+      isEditor = false;
+    }
+    applyRoleUI();
+  }
+
+  function applyRoleUI(){
+    readonlyPill.classList.toggle('show', !isEditor);
+    document.getElementById('addReleaseBtn').style.display = isEditor ? '' : 'none';
+    document.getElementById('addArtistBtn').style.display = isEditor ? '' : 'none';
+    document.getElementById('importBtn').style.display = isEditor ? '' : 'none';
+    if(typeof renderArtists==='function') renderArtists();
+  }
+
   function watchAuth(){
-    firebase.auth().onAuthStateChanged((user)=>{
+    firebase.auth().onAuthStateChanged(async (user)=>{
       if(user){
         loginScreen.classList.remove('show');
         attachListeners();
+        await checkRole();
       } else {
         loginScreen.classList.add('show');
+        isEditor = false;
+        applyRoleUI();
         if(unsubReleases){ unsubReleases(); unsubReleases = null; }
         if(unsubArtists){ unsubArtists(); unsubArtists = null; }
       }
