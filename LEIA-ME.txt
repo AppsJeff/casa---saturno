@@ -1,0 +1,17 @@
+MOUSIK — CENTRAL DE PRODUÇÃO
+=============================
+
+Estes são os arquivos do app. Siga o passo a passo que o Claude te
+deu na conversa para:
+
+1. Colar estes arquivos no repositório do GitHub (mousik-producao)
+2. Criar o projeto no Firebase e colar as chaves em "firebase-config.js"
+3. Ativar o GitHub Pages
+4. Criar os primeiros usuários (editor/leitor) na coleção "roles" do Firestore
+
+Arquivos:
+- index.html        → estrutura da página
+- style.css          → visual (cores, fontes, layout)
+- app.js             → toda a lógica do app
+- firebase-config.js → suas chaves do Firebase (precisa editar!)
+- manifest.json      → permite instalar o app no celular
