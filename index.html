@@ -1,242 +1,1985 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mousik — Central de Produção</title>
-<link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0A0A0A" />
-<link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casa Saturno — Central de Lançamentos</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a16">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- iOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Casa Saturno">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Firebase (banco de dados online) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --void:#0a0a16;
+    --void-2:#12122a;
+    --void-3:#191933;
+    --line: rgba(155,92,255,0.18);
+    --gold:#f2c14e;
+    --magenta:#ff3ea5;
+    --cyan:#3eefff;
+    --violet:#9b5cff;
+    --text:#edeaf6;
+    --text-dim:#8b85a8;
+    --success:#4ade80;
+    --warn:#ffb84d;
+    --danger:#ff5c6c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(155,92,255,0.28), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 110% 10%, rgba(62,239,255,0.14), transparent 55%),
+      var(--void);
+    color:var(--text);
+    font-family:'Rajdhani', sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+
+  /* ===== layout shell ===== */
+  .wrap{ max-width:1040px; margin:0 auto; padding:20px 16px 120px; }
+
+  header.top{
+    display:flex; align-items:center; gap:14px; padding:6px 2px 22px;
+    position:relative;
+  }
+  .saturn-badge{
+    position:relative; width:46px; height:46px; flex:0 0 auto;
+  }
+  .saturn-badge .core{
+    position:absolute; inset:11px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #ffe9ad, var(--gold) 60%, #a9791f 100%);
+    box-shadow:0 0 18px rgba(242,193,78,0.55);
+  }
+  .saturn-badge .ring{
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid var(--violet);
+    transform:rotate(-20deg) scaleY(0.36);
+    box-shadow:0 0 12px rgba(155,92,255,0.6);
+  }
+  .brand h1{
+    font-family:'Orbitron', sans-serif; font-weight:800; font-size:19px;
+    letter-spacing:1.5px; margin:0; color:var(--text);
+    text-shadow:0 0 18px rgba(155,92,255,0.5);
+  }
+  .brand p{
+    margin:2px 0 0; font-size:12.5px; color:var(--text-dim); letter-spacing:1.5px;
+    text-transform:uppercase; font-weight:600;
+  }
+
+  /* ===== view tabs ===== */
+  .view-tabs{
+    display:flex; gap:6px; margin-bottom:16px; background:var(--void-2);
+    border:1px solid var(--line); border-radius:12px; padding:4px;
+  }
+  .view-tabs button{
+    flex:1; border:none; background:transparent; color:var(--text-dim);
+    font-family:'Orbitron', sans-serif; font-size:10.5px; letter-spacing:.6px;
+    padding:11px 4px; border-radius:9px; cursor:pointer; font-weight:700;
+    transition:all .18s ease;
+  }
+  .view-tabs button.active{
+    background:linear-gradient(135deg, var(--violet), #6a2fd9);
+    color:#fff; box-shadow:0 0 16px rgba(155,92,255,0.45);
+  }
+
+  /* ===== type filter chips ===== */
+  .chip-row{
+    display:flex; gap:8px; overflow-x:auto; padding:2px 2px 14px; scrollbar-width:none;
+  }
+  .chip-row::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:0 0 auto; display:flex; align-items:center; gap:6px;
+    padding:8px 14px; border-radius:100px; font-size:13px; font-weight:700;
+    border:1px solid var(--line); background:var(--void-2); color:var(--text-dim);
+    cursor:pointer; white-space:nowrap; transition:all .15s ease;
+  }
+  .chip .dot{width:8px; height:8px; border-radius:50%; flex:0 0 auto;}
+  .chip.active{ color:#0a0a16; border-color:transparent; }
+
+  .chip[data-type="all"].active{ background:var(--text); }
+  .chip[data-type="Saturno Turbo"].active{ background:var(--gold); box-shadow:0 0 14px rgba(242,193,78,.5);}
+  .chip[data-type="Single"].active{ background:var(--magenta); box-shadow:0 0 14px rgba(255,62,165,.5);}
+  .chip[data-type="EP"].active{ background:var(--cyan); box-shadow:0 0 14px rgba(62,239,255,.5);}
+  .chip[data-type="Álbum"].active{ background:var(--violet); color:#fff; box-shadow:0 0 14px rgba(155,92,255,.55);}
+
+  .dot.all{background:var(--text);}
+  .dot.Saturno-Turbo{background:var(--gold);}
+  .dot.Single{background:var(--magenta);}
+  .dot.EP{background:var(--cyan);}
+  .dot.Álbum{background:var(--violet);}
+
+  /* ===== fixed action buttons (both always visible) ===== */
+  .fab-row{
+    position:fixed; left:0; right:0; bottom:16px; z-index:40;
+    display:flex; gap:10px; justify-content:center; padding:0 16px;
+  }
+  .add-btn{
+    flex:1 1 0; max-width:230px; display:flex; align-items:center; justify-content:center; gap:7px;
+    background:linear-gradient(135deg, var(--magenta), var(--violet));
+    color:#fff; border:none; border-radius:100px; padding:14px 16px;
+    font-family:'Orbitron', sans-serif; font-weight:700; font-size:11px; letter-spacing:.8px;
+    cursor:pointer; box-shadow:0 6px 24px rgba(255,62,165,0.4), 0 0 0 1px rgba(255,255,255,0.08);
+    white-space:nowrap;
+  }
+  .add-btn.artist-mode{
+    background:linear-gradient(135deg, var(--cyan), var(--violet));
+    box-shadow:0 6px 24px rgba(62,239,255,0.35), 0 0 0 1px rgba(255,255,255,0.08);
+  }
+  .add-btn:active{ transform:scale(0.96); }
+
+  /* ===== empty state ===== */
+  .empty{
+    text-align:center; padding:70px 20px; color:var(--text-dim);
+    border:1px dashed var(--line); border-radius:16px; margin-top:10px;
+  }
+  .empty .glyph{font-size:34px; margin-bottom:10px;}
+  .empty h3{ font-family:'Orbitron',sans-serif; color:var(--text); font-size:14px; letter-spacing:1px;}
+  .empty p{font-size:13.5px; max-width:340px; margin:6px auto 0;}
+
+  /* ===== cards (shared: releases + artists) ===== */
+  .cards{ display:flex; flex-direction:column; gap:12px; }
+  .card{
+    position:relative; background:linear-gradient(145deg, var(--void-3), var(--void-2));
+    border:1px solid var(--line); border-radius:16px; padding:16px 16px 14px 18px;
+    cursor:pointer; overflow:hidden; transition:border-color .15s ease, transform .1s ease;
+  }
+  .card:active{ transform:scale(0.99); }
+  .card:hover{ border-color:rgba(155,92,255,0.5); }
+  .card .type-bar{
+    position:absolute; left:0; top:0; bottom:0; width:5px;
+  }
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .card-title{ min-width:0; }
+  .card-title .artist{
+    font-family:'Orbitron', sans-serif; font-size:13px; font-weight:700; letter-spacing:.5px;
+    color:var(--text); overflow:hidden; text-overflow:ellipsis;
+    display:flex; align-items:center; flex-wrap:wrap; gap:5px 6px;
+  }
+  .card-title .track{
+    font-size:16px; font-weight:600; color:var(--text); margin-top:4px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .mini-artist-dot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; display:inline-block; }
+  .card-meta{
+    display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;
+  }
+  .type-pill{
+    font-size:10.5px; font-weight:700; letter-spacing:.6px; padding:3px 9px; border-radius:100px;
+    text-transform:uppercase; font-family:'Orbitron',sans-serif;
+  }
+  .date-tag{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
+  }
+  .status-pill{
+    display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700;
+    padding:4px 10px; border-radius:100px; margin-left:auto;
+  }
+  .status-pill .ring{
+    width:16px; height:16px; border-radius:50%;
+    background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), rgba(255,255,255,0.12) 0);
+    display:flex; align-items:center; justify-content:center;
+    flex:0 0 auto;
+  }
+  .status-pill .ring::after{
+    content:''; width:9px; height:9px; border-radius:50%; background:var(--void-2);
+  }
+
+  /* artist card specifics */
+  .artist-card .avatar{
+    width:40px; height:40px; border-radius:50%; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Orbitron',sans-serif; font-weight:800; font-size:15px; color:#0a0a16;
+  }
+  .artist-card .card-top{ align-items:center; gap:12px; }
+  .artist-count{
+    font-size:11.5px; color:var(--text-dim); margin-left:auto; white-space:nowrap;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .card-actions{ display:flex; gap:8px; margin-top:12px; }
+  .mini-action-btn{
+    flex:1; background:var(--void); border:1px solid var(--line); color:var(--text-dim);
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; padding:9px 8px;
+    border-radius:10px; cursor:pointer; white-space:nowrap;
+  }
+  .mini-action-btn:active{ transform:scale(0.97); }
+  .artist-filter-bar{
+    display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim);
+    background:var(--void-2); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:12px;
+  }
+  .artist-filter-bar b{ color:var(--text); }
+  .artist-filter-bar button{
+    margin-left:auto; background:none; border:none; color:var(--cyan); font-weight:700; font-size:12.5px; cursor:pointer;
+  }
+
+  /* ===== modal ===== */
+  .overlay{
+    position:fixed; inset:0; background:rgba(6,6,14,0.72); backdrop-filter:blur(3px);
+    display:none; align-items:flex-end; justify-content:center; z-index:100;
+  }
+  .overlay.show{ display:flex; }
+  .overlay.stacked{ z-index:200; background:rgba(6,6,14,0.85); }
+  .modal{
+    width:100%; max-width:560px; max-height:92vh; overflow-y:auto;
+    background:var(--void-2); border:1px solid var(--line); border-top:1px solid rgba(155,92,255,0.4);
+    border-radius:20px 20px 0 0; padding:20px 18px 26px;
+  }
+  @media (min-width:640px){
+    .overlay{ align-items:center; }
+    .modal{ border-radius:20px; }
+  }
+  .modal h2{
+    font-family:'Orbitron', sans-serif; font-size:15px; letter-spacing:1px; margin:0 0 16px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .modal h2 .close{
+    font-family:'Rajdhani',sans-serif; font-size:22px; color:var(--text-dim); cursor:pointer; line-height:1;
+    padding:4px 8px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{
+    display:block; font-size:11.5px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
+    color:var(--text-dim); margin-bottom:6px;
+  }
+  .field label .opt{ text-transform:none; font-weight:500; letter-spacing:0; color:var(--text-dim); opacity:.75; }
+  .field input, .field select, .field textarea{
+    width:100%; background:var(--void); border:1px solid var(--line); border-radius:10px;
+    padding:11px 12px; color:var(--text); font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:600;
+    appearance:none; -webkit-appearance:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none; border-color:var(--violet); box-shadow:0 0 0 3px rgba(155,92,255,0.2);
+  }
+  .field textarea{ resize:vertical; min-height:60px; font-weight:500; }
+  .field-hint{ font-size:12px; color:var(--text-dim); margin-top:8px; }
+  .link-btn{
+    background:none; border:none; color:var(--cyan); font-weight:700; font-size:12.5px;
+    cursor:pointer; padding:2px 0; text-decoration:underline; text-underline-offset:3px;
+  }
+  .artist-warn{
+    background:rgba(255,184,77,0.1); border:1px solid rgba(255,184,77,0.35); border-radius:12px;
+    padding:12px 14px; font-size:13px; color:var(--warn); margin-bottom:14px; line-height:1.4;
+  }
+  .artist-picker{
+    display:flex; flex-wrap:wrap; gap:8px; padding:12px; border:1px solid var(--line);
+    border-radius:12px; background:var(--void); min-height:48px;
+  }
+  .artist-chip{
+    padding:7px 14px 7px 9px; border-radius:100px; border:1.5px solid var(--line); background:var(--void-2);
+    color:var(--text-dim); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;
+    display:flex; align-items:center; gap:7px; transition:all .12s ease;
+  }
+  .artist-chip .mark{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+  .artist-chip.sel{ color:#0a0a16; }
+  .artist-picker .none-msg{ font-size:12.5px; color:var(--text-dim); padding:6px; }
+  .type-select{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .type-opt{
+    border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center;
+    font-family:'Orbitron',sans-serif; font-size:10.5px; font-weight:700; letter-spacing:.5px;
+    cursor:pointer; color:var(--text-dim); background:var(--void);
+  }
+  .type-opt.sel[data-type="Saturno Turbo"]{ background:rgba(242,193,78,0.15); border-color:var(--gold); color:var(--gold); }
+  .type-opt.sel[data-type="Single"]{ background:rgba(255,62,165,0.15); border-color:var(--magenta); color:var(--magenta); }
+  .type-opt.sel[data-type="EP"]{ background:rgba(62,239,255,0.15); border-color:var(--cyan); color:var(--cyan); }
+  .type-opt.sel[data-type="Álbum"]{ background:rgba(155,92,255,0.18); border-color:var(--violet); color:#c9aeff; }
+  .status-list{ display:flex; flex-direction:column; gap:8px; }
+  .status-opt{
+    display:flex; align-items:center; gap:11px; padding:11px 13px; border:1px solid var(--line);
+    border-radius:10px; background:var(--void); cursor:pointer; font-weight:600; font-size:14px; color:var(--text-dim);
+    transition:all .12s ease;
+  }
+  .status-opt .box{
+    width:19px; height:19px; border-radius:6px; border:2px solid var(--line); flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center; font-size:12px; color:transparent; font-weight:900;
+  }
+  .status-opt.sel{ border-color:var(--cyan); color:var(--text); background:rgba(62,239,255,0.08); }
+  .status-opt.sel .box{ background:var(--cyan); border-color:var(--cyan); color:#0a0a16; }
+  .status-opt.sel .box::after{ content:'✓'; }
+  .color-picker{ display:grid; grid-template-columns:repeat(7,1fr); gap:10px; padding:4px 2px; }
+  .swatch{
+    width:100%; aspect-ratio:1/1; border-radius:50%; cursor:pointer; border:2px solid transparent;
+    display:flex; align-items:center; justify-content:center; font-size:12px; color:#0a0a16; font-weight:900;
+  }
+  .swatch.sel{ border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,0.15); }
+  .swatch .check{ opacity:0; }
+  .swatch.sel .check{ opacity:1; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .modal-actions{ display:flex; gap:10px; margin-top:20px; }
+  .btn{
+    flex:1; border:none; border-radius:12px; padding:13px; font-family:'Orbitron',sans-serif;
+    font-size:11.5px; font-weight:700; letter-spacing:1px; cursor:pointer;
+  }
+  .btn.primary{ background:linear-gradient(135deg, var(--magenta), var(--violet)); color:#fff; }
+  .btn.primary.cyan{ background:linear-gradient(135deg, var(--cyan), var(--violet)); }
+  .btn.ghost{ background:transparent; border:1px solid var(--line); color:var(--text-dim); flex:0 0 auto; padding:13px 16px; }
+  .btn.danger{ background:transparent; border:1px solid rgba(255,92,108,0.4); color:var(--danger); flex:0 0 auto; padding:13px 16px; }
+
+  /* ===== calendar ===== */
+  .cal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .cal-head .month{
+    font-family:'Orbitron', sans-serif; font-size:14px; letter-spacing:1px; text-transform:uppercase;
+  }
+  .cal-nav{ display:flex; gap:8px; }
+  .cal-nav button{
+    background:var(--void-2); border:1px solid var(--line); color:var(--text);
+    width:34px; height:34px; border-radius:9px; font-size:16px; cursor:pointer;
+  }
+  .radar{
+    background:radial-gradient(circle at 50% 0%, rgba(62,239,255,0.06), transparent 60%), var(--void-2);
+    border:1px solid var(--line); border-radius:16px; padding:12px 8px 14px; position:relative; overflow:hidden;
+  }
+  .weekday-row{ display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:6px; }
+  .weekday-row span{
+    text-align:center; font-size:10px; color:var(--text-dim); font-weight:700; letter-spacing:.5px;
+  }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .day-cell{
+    aspect-ratio:1/1; border-radius:9px; border:1px solid var(--line); background:rgba(255,255,255,0.015);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:5px 2px 3px;
+    cursor:pointer; position:relative; min-height:40px;
+  }
+  .day-cell.empty-cell{ border:none; background:transparent; cursor:default; }
+  .day-cell.today{ border-color:var(--cyan); box-shadow:0 0 8px rgba(62,239,255,0.35); }
+  .day-cell.selected{ border-color:var(--violet); box-shadow:0 0 10px rgba(155,92,255,0.55); background:rgba(155,92,255,0.1); }
+  .day-cell .num{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); }
+  .day-cell.has-events .num{ color:var(--text); font-weight:700; }
+  .day-dots{ display:flex; gap:2px; margin-top:4px; flex-wrap:wrap; justify-content:center; }
+  .day-dots span{ width:5px; height:5px; border-radius:50%; }
+
+  .day-panel{
+    margin-top:14px; background:var(--void-2); border:1px solid var(--line); border-radius:16px; padding:14px 16px;
+  }
+  .day-panel h4{ font-family:'Orbitron',sans-serif; font-size:12px; margin:0 0 10px; color:var(--text-dim); letter-spacing:1px; }
+  .day-panel .mini-card{
+    display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line);
+    cursor:pointer;
+  }
+  .day-panel .mini-card:first-of-type{ border-top:none; }
+  .day-panel .mini-dots{ display:flex; gap:3px; flex:0 0 auto; }
+  .day-panel .mini-dots span{ width:9px; height:9px; border-radius:50%; }
+  .day-panel .mini-info b{ display:block; font-size:13.5px; }
+  .day-panel .mini-info span{ font-size:11.5px; color:var(--text-dim); }
+  .day-add-btn{
+    width:100%; margin-top:14px; background:linear-gradient(135deg, var(--cyan), var(--violet));
+    color:#0a0a16; border:none; border-radius:10px; padding:12px; font-family:'Orbitron',sans-serif;
+    font-weight:700; font-size:11.5px; letter-spacing:.5px; cursor:pointer;
+  }
+  .day-add-btn:active{ transform:scale(0.98); }
+
+  .legend-row{
+    display:flex; gap:10px; overflow-x:auto; padding:2px 2px 4px; margin-top:14px; scrollbar-width:none;
+  }
+  .legend-row::-webkit-scrollbar{ display:none; }
+  .legend-chip{
+    flex:0 0 auto; display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text);
+    background:var(--void-2); border:1px solid var(--line); padding:6px 11px; border-radius:100px; white-space:nowrap;
+  }
+  .legend-chip i{ width:9px; height:9px; border-radius:50%; display:inline-block; flex:0 0 auto; }
+
+  .loading{ text-align:center; padding:60px 0; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:13px; }
+
+  /* ===== report view ===== */
+  .report-filters{
+    background:var(--void-2); border:1px solid var(--line); border-radius:14px; padding:14px 14px 6px; margin-bottom:14px;
+  }
+  .report-filters .field{ margin-bottom:12px; }
+  #reportClearFilters{ margin-bottom:10px; }
+  .report-summary{
+    font-size:12.5px; color:var(--text-dim); margin-bottom:10px; font-family:'JetBrains Mono',monospace;
+  }
+  .report-table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:14px; margin-bottom:16px; }
+  table.report-table{ border-collapse:collapse; width:100%; min-width:600px; }
+  table.report-table th{
+    text-align:left; font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--text-dim); background:var(--void-2); padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.report-table td{
+    padding:10px 12px; font-size:13px; border-bottom:1px solid var(--line); color:var(--text); white-space:nowrap;
+  }
+  table.report-table tr:last-child td{ border-bottom:none; }
+  table.report-table tr:nth-child(even){ background:rgba(255,255,255,0.02); }
+
+  /* ===== chronogram (cronograma) ===== */
+  .chrono-scroll{
+    overflow-x:auto; overflow-y:hidden; border:1px solid var(--line); border-radius:14px;
+    background:var(--void-2); margin-bottom:14px; -webkit-overflow-scrolling:touch;
+  }
+  .chrono-row{ display:flex; align-items:center; border-bottom:1px solid var(--line); cursor:pointer; }
+  .chrono-row:last-child{ border-bottom:none; }
+  .chrono-row:active{ background:rgba(255,255,255,0.03); }
+  .chrono-label{
+    position:sticky; left:0; z-index:4; background:var(--void-2); width:168px; flex:0 0 168px;
+    padding:10px 12px; border-right:1px solid var(--line); overflow:hidden;
+  }
+  .chrono-label b{ display:block; font-size:12.5px; color:var(--text); font-family:'Orbitron',sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chrono-label span{ display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chrono-lane{ position:relative; height:52px; flex:0 0 auto; }
+  .chrono-bar{ position:absolute; top:50%; height:5px; border-radius:4px; transform:translateY(-50%); }
+  .chrono-marker{
+    position:absolute; top:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:10.5px; border:2px solid var(--void-2);
+  }
+  .chrono-today-line{ position:absolute; top:0; bottom:0; width:2px; background:var(--cyan); box-shadow:0 0 6px var(--cyan); z-index:6; }
+  .chrono-legend{
+    display:flex; gap:14px; flex-wrap:wrap; margin-top:4px; font-size:11.5px; color:var(--text-dim);
+  }
+
+  /* ===== backup bar ===== */
+  .backup-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .backup-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--void-2); border:1px solid var(--line); color:var(--text-dim);
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; padding:10px; border-radius:10px;
+    cursor:pointer;
+  }
+  .backup-btn:active{ transform:scale(0.98); }
+  .offline-pill{
+    display:none; align-items:center; gap:6px; justify-content:center;
+    font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--warn);
+    background:rgba(255,184,77,0.1); border:1px solid rgba(255,184,77,0.3);
+    border-radius:100px; padding:6px 12px; margin-bottom:14px; font-family:'Orbitron',sans-serif;
+  }
+  .offline-pill.show{ display:flex; }
+  .readonly-pill{
+    display:none; align-items:center; gap:6px; justify-content:center;
+    font-size:11px; font-weight:700; letter-spacing:.5px; color:#c9aeff;
+    background:rgba(155,92,255,0.12); border:1px solid rgba(155,92,255,0.35);
+    border-radius:100px; padding:6px 12px; margin-bottom:14px; font-family:'Orbitron',sans-serif;
+  }
+  .readonly-pill.show{ display:flex; }
+</style>
 </head>
 <body>
 
-  <!-- ===================== TELA DE LOGIN ===================== -->
-  <div id="login-screen" class="login-screen">
-    <div class="login-box">
-      <div class="logo">M<span class="logo-o"></span>usik</div>
-      <p class="login-subtitle">Central de Produção</p>
-      <input id="login-email" type="email" placeholder="E-mail" autocomplete="username" />
-      <input id="login-password" type="password" placeholder="Senha" autocomplete="current-password" />
-      <button id="login-btn" class="btn-primary">Entrar</button>
-      <p id="login-error" class="login-error"></p>
+<div class="wrap">
+  <header class="top">
+    <div class="saturn-badge"><div class="core"></div><div class="ring"></div></div>
+    <div class="brand">
+      <h1>CASA SATURNO</h1>
+      <p>Central de Lançamentos</p>
     </div>
+  </header>
+
+  <div class="offline-pill" id="offlinePill">● MODO OFFLINE — os dados continuam salvos neste aparelho</div>
+  <div class="readonly-pill" id="readonlyPill">🔒 MODO SOMENTE LEITURA</div>
+
+  <div class="backup-row">
+    <button class="backup-btn" id="exportBtn">☁ Exportar backup</button>
+    <button class="backup-btn" id="importBtn">⬆ Importar backup</button>
+    <button class="backup-btn" id="settingsBtn">⚙ Conexão</button>
+    <button class="backup-btn" id="logoutBtn">⎋ Sair</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
   </div>
 
-  <!-- ===================== APP ===================== -->
-  <div id="app" class="app hidden">
-    <aside class="sidebar">
-      <div>
-        <div class="logo">M<span class="logo-o"></span>usik</div>
-        <p class="sidebar-subtitle">Central de Produção</p>
-        <nav id="nav" class="nav">
-          <button class="nav-item active" data-tab="tarefas">Tarefas</button>
-          <button class="nav-item" data-tab="cronograma">Cronograma</button>
-          <button class="nav-item" data-tab="calendario">Calendário</button>
-          <button class="nav-item" data-tab="lancamentos">Lançamentos</button>
-          <button class="nav-item" data-tab="artistas">Artistas</button>
-          <button class="nav-item" data-tab="produtores">Produtores</button>
-          <button class="nav-item" data-tab="autores">Autores</button>
-          <button class="nav-item" data-tab="editoras">Editoras</button>
-          <button class="nav-item" data-tab="obras">Obras</button>
-          <button class="nav-item" data-tab="relatorio">Relatório</button>
-        </nav>
-      </div>
-      <div class="sidebar-footer">
-        <div class="role-box">
-          <div>
-            <p class="label-muted">Acesso</p>
-            <p id="role-label">—</p>
-          </div>
-        </div>
-        <p id="user-email" class="user-email"></p>
-        <button id="logout-btn" class="btn-ghost">Sair</button>
-      </div>
-    </aside>
-
-    <main class="main">
-      <header class="main-header">
-        <div>
-          <p class="label-muted" id="tab-eyebrow">Tarefas</p>
-          <h1 id="tab-title">Tarefas em produção</h1>
-        </div>
-        <button id="new-task-btn" class="btn-primary hidden">+ Nova Tarefa</button>
-        <button id="new-obra-btn" class="btn-primary hidden">+ Nova Obra</button>
-      </header>
-
-      <div id="content"></div>
-    </main>
+  <div class="view-tabs">
+    <button id="tab-list" class="active">▤ LANÇAMENTOS</button>
+    <button id="tab-cal">◎ CALENDÁRIO</button>
+    <button id="tab-artists">✦ ARTISTAS</button>
+    <button id="tab-report">▦ RELATÓRIO</button>
+    <button id="tab-chrono">🗓 CRONOGRAMA</button>
   </div>
 
-  <!-- ===================== MODAL: NOVA TAREFA ===================== -->
-  <div id="task-modal" class="modal-overlay hidden">
-    <div class="modal">
-      <div class="modal-header">
-        <p id="task-modal-title">Nova Tarefa</p>
-        <button id="close-modal-btn" class="btn-icon">✕</button>
+  <!-- LIST VIEW -->
+  <div id="view-list">
+    <div class="chip-row" id="chipRow">
+      <div class="chip active" data-type="all"><span class="dot all"></span>Todos</div>
+      <div class="chip" data-type="Saturno Turbo"><span class="dot Saturno-Turbo"></span>⚡ Saturno Turbo</div>
+      <div class="chip" data-type="Single"><span class="dot Single"></span>🎵 Single</div>
+      <div class="chip" data-type="EP"><span class="dot EP"></span>💿 EP</div>
+      <div class="chip" data-type="Álbum"><span class="dot Álbum"></span>🪐 Álbum</div>
+    </div>
+    <div id="listArea"><div class="loading">carregando lançamentos…</div></div>
+  </div>
+
+  <!-- CALENDAR VIEW -->
+  <div id="view-cal" style="display:none;">
+    <div class="cal-head">
+      <div class="cal-nav"><button id="prevMonth">‹</button></div>
+      <div class="month" id="monthLabel">—</div>
+      <div class="cal-nav"><button id="nextMonth">›</button></div>
+    </div>
+    <div class="radar">
+      <div class="weekday-row">
+        <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
       </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+    <div class="legend-row" id="artistLegend"></div>
+    <div id="dayPanel" style="display:none;" class="day-panel"></div>
+  </div>
 
-      <div class="modal-body">
-        <label class="field-label">Título</label>
-        <input id="f-titulo" type="text" placeholder="Ex: Single novo — nome do artista" />
+  <!-- ARTISTS VIEW -->
+  <div id="view-artists" style="display:none;">
+    <div id="artistArea"><div class="loading">carregando artistas…</div></div>
+  </div>
 
-        <label class="field-label">Obra</label>
-        <select id="f-obra">
-          <option value="">— Obra temporária (digitar abaixo) —</option>
+  <!-- REPORT VIEW -->
+  <div id="view-report" style="display:none;">
+    <div class="chip-row" id="reportChipRow">
+      <div class="chip active" data-type="all"><span class="dot all"></span>Todos</div>
+      <div class="chip" data-type="Saturno Turbo"><span class="dot Saturno-Turbo"></span>⚡ Saturno Turbo</div>
+      <div class="chip" data-type="Single"><span class="dot Single"></span>🎵 Single</div>
+      <div class="chip" data-type="EP"><span class="dot EP"></span>💿 EP</div>
+      <div class="chip" data-type="Álbum"><span class="dot Álbum"></span>🪐 Álbum</div>
+    </div>
+
+    <div class="report-filters">
+      <div class="field">
+        <label>Artista</label>
+        <select id="reportArtistSelect">
+          <option value="">Todos os artistas</option>
         </select>
-        <input id="f-obra-temp" type="text" placeholder="Nome temporário da obra (até ser cadastrada)" style="margin-top:6px" />
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>De</label>
+          <input type="date" id="reportDateFrom">
+        </div>
+        <div class="field">
+          <label>Até</label>
+          <input type="date" id="reportDateTo">
+        </div>
+      </div>
+      <button type="button" class="link-btn" id="reportClearFilters">✕ limpar filtros</button>
+    </div>
 
-        <label class="field-label">Tipo</label>
-        <select id="f-tipo">
-          <option>Show</option>
-          <option>Single</option>
-          <option>Composição</option>
-        </select>
+    <div class="report-summary" id="reportSummary"></div>
+    <div id="reportTableWrap"></div>
 
-        <div id="f-artista-wrap">
-          <label class="field-label">Artista</label>
-          <div class="select-row">
-            <select id="f-artista"></select>
-            <button type="button" class="btn-small" data-add="artistas">+ Novo</button>
+    <button type="button" class="day-add-btn" id="reportExportBtn">⬇ Baixar planilha (.xlsx)</button>
+  </div>
+
+  <!-- CHRONOGRAM VIEW -->
+  <div id="view-chrono" style="display:none;">
+    <div class="chip-row" id="chronoChipRow">
+      <div class="chip active" data-type="all"><span class="dot all"></span>Todos</div>
+      <div class="chip" data-type="Saturno Turbo"><span class="dot Saturno-Turbo"></span>⚡ Saturno Turbo</div>
+      <div class="chip" data-type="Single"><span class="dot Single"></span>🎵 Single</div>
+      <div class="chip" data-type="EP"><span class="dot EP"></span>💿 EP</div>
+      <div class="chip" data-type="Álbum"><span class="dot Álbum"></span>🪐 Álbum</div>
+    </div>
+    <div id="chronoWrap"></div>
+    <div class="chrono-legend">
+      <span>🎚 Entrega do master</span>
+      <span>🎬 Entrega do clipe</span>
+      <span>● Lançamento <i style="color:var(--text-dim)">(cor = status)</i></span>
+      <span style="color:var(--cyan);">┃ Hoje</span>
+    </div>
+  </div>
+</div>
+
+<div class="fab-row">
+  <button class="add-btn" id="addReleaseBtn">＋ NOVO LANÇAMENTO</button>
+  <button class="add-btn artist-mode" id="addArtistBtn">＋ NOVO ARTISTA</button>
+</div>
+
+<!-- RELEASE MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2><span id="modalTitle">Novo Lançamento</span><span class="close" id="closeModal">×</span></h2>
+    <div id="editMeta" style="display:none; font-size:11.5px; color:var(--text-dim); margin:-8px 0 14px; line-height:1.4;"></div>
+
+    <div id="noArtistWarn" class="artist-warn" style="display:none;">
+      Nenhum artista cadastrado ainda. Cadastre o artista primeiro para poder vinculá-lo a um lançamento.
+    </div>
+
+    <form id="releaseForm">
+      <input type="hidden" id="releaseId">
+
+      <div class="field">
+        <label>Artista(s) <span class="opt">— obrigatório, selecione um ou mais</span></label>
+        <div class="artist-picker" id="artistPicker"></div>
+        <div class="field-hint">Não encontrou? <button type="button" class="link-btn" id="quickAddArtist">＋ cadastrar novo artista</button></div>
+      </div>
+
+      <div class="field">
+        <label>Título da música <span class="opt">— obrigatório</span></label>
+        <input type="text" id="fTitulo" placeholder="Órbita Azul" required>
+      </div>
+
+      <div class="field">
+        <label>Data de lançamento <span class="opt">— obrigatório</span></label>
+        <input type="date" id="fData" required>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Entrega do master <span class="opt">(opcional)</span></label>
+          <input type="date" id="fMasterData">
+        </div>
+        <div class="field">
+          <label>Entrega do clipe <span class="opt">(opcional)</span></label>
+          <input type="date" id="fClipeData">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Tipo de lançamento <span class="opt">(opcional)</span></label>
+        <div class="type-select" id="typeSelect">
+          <div class="type-opt" data-type="Saturno Turbo">⚡ SATURNO TURBO</div>
+          <div class="type-opt" data-type="Single">🎵 SINGLE</div>
+          <div class="type-opt" data-type="EP">💿 EP</div>
+          <div class="type-opt" data-type="Álbum">🪐 ÁLBUM</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Status <span class="opt">— obrigatório</span></label>
+        <div class="status-list" id="statusList"></div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Gênero <span class="opt">(opcional)</span></label>
+          <input type="text" id="fGenero" placeholder="Synth-pop">
+        </div>
+        <div class="field">
+          <label>Responsável <span class="opt">(opcional)</span></label>
+          <input type="text" id="fResp" placeholder="Marina">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Distribuidora <span class="opt">(opcional)</span></label>
+        <input type="text" id="fDistrib" placeholder="Distro Digital">
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>ISRC <span class="opt">(opcional)</span></label>
+          <input type="text" id="fIsrc" placeholder="BR-XXX-26-00001">
+        </div>
+        <div class="field">
+          <label>UPC / EAN <span class="opt">(opcional)</span></label>
+          <input type="text" id="fUpc" placeholder="1234567891234">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Link Spotify <span class="opt">(opcional)</span></label>
+          <input type="url" id="fSpotify" placeholder="https://open.spotify.com/...">
+        </div>
+        <div class="field">
+          <label>Link YouTube <span class="opt">(opcional)</span></label>
+          <input type="url" id="fYoutube" placeholder="https://youtube.com/...">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Observações <span class="opt">(opcional)</span></label>
+        <textarea id="fObs" placeholder="Notas internas sobre o lançamento..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="deleteBtn" style="display:none;">Excluir</button>
+        <button type="button" class="btn ghost" id="cancelBtn">Cancelar</button>
+        <button type="submit" class="btn primary" id="saveReleaseBtn">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TELA DE LOGIN (e-mail + senha) -->
+<div class="overlay" id="loginScreen" style="z-index:290;">
+  <div class="modal">
+    <h2><span>Entrar</span></h2>
+    <p style="font-size:13px; color:var(--text-dim); line-height:1.5; margin:0 0 14px;">
+      Digite o e-mail e a senha que foram criados para você no Firebase (peça para quem administra a Casa Saturno, se ainda não tiver).
+    </p>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="loginEmail" placeholder="voce@exemplo.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div id="loginError" style="display:none; color:var(--danger); font-size:12.5px; margin-bottom:10px; line-height:1.4;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn primary cyan" id="loginSubmitBtn" style="flex:1;">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TELA DE CONEXÃO COM O BANCO DE DADOS (Firebase) -->
+<div class="overlay" id="setupScreen" style="z-index:300;">
+  <div class="modal">
+    <h2><span>Conectar ao banco de dados</span></h2>
+    <p style="font-size:13px; color:var(--text-dim); line-height:1.5; margin:0 0 14px;">
+      Cole abaixo a configuração do seu projeto Firebase (Firebase Console → ⚙ Configurações do projeto → seus apps → "SDK setup and configuration"). Isso conecta este aparelho ao banco de dados online da Casa Saturno — o passo a passo completo está no guia enviado junto com este app.
+    </p>
+    <div class="field">
+      <label>Configuração do Firebase (firebaseConfig)</label>
+      <textarea id="fbConfigInput" style="min-height:150px; font-family:'JetBrains Mono',monospace; font-size:12px;" placeholder='{
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+}'></textarea>
+    </div>
+    <div id="setupError" style="display:none; color:var(--danger); font-size:12.5px; margin-bottom:10px; line-height:1.4;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn primary cyan" id="setupSaveBtn" style="flex:1;">Conectar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ARTIST MODAL -->
+<div class="overlay" id="overlayArtist">
+  <div class="modal">
+    <h2><span id="artistModalTitle">Novo Artista</span><span class="close" id="closeArtistModal">×</span></h2>
+    <div id="editMetaArtist" style="display:none; font-size:11.5px; color:var(--text-dim); margin:-8px 0 14px; line-height:1.4;"></div>
+    <form id="artistForm">
+      <input type="hidden" id="artistId">
+
+      <div class="field">
+        <label>Nome do artista <span class="opt">— obrigatório</span></label>
+        <input type="text" id="aNome" placeholder="Nebulosa" required>
+      </div>
+
+      <div class="field">
+        <label>Cor do artista <span class="opt">— aparece no calendário</span></label>
+        <div class="color-picker" id="colorPicker"></div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Gênero principal <span class="opt">(opcional)</span></label>
+          <input type="text" id="aGenero" placeholder="Synth-pop">
+        </div>
+        <div class="field">
+          <label>Contato <span class="opt">(opcional)</span></label>
+          <input type="text" id="aContato" placeholder="e-mail ou telefone">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Redes sociais <span class="opt">(opcional)</span></label>
+        <input type="text" id="aRedes" placeholder="@nebulosa">
+      </div>
+
+      <div class="field">
+        <label>Observações <span class="opt">(opcional)</span></label>
+        <textarea id="aObs" placeholder="Notas sobre o artista, contrato, etc."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn danger" id="deleteArtistBtn" style="display:none;">Excluir</button>
+        <button type="button" class="btn ghost" id="cancelArtistBtn">Cancelar</button>
+        <button type="submit" class="btn primary cyan" id="saveArtistBtn">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const TYPE_COLOR = {
+    "Saturno Turbo": "var(--gold)",
+    "Single": "var(--magenta)",
+    "EP": "var(--cyan)",
+    "Álbum": "var(--violet)"
+  };
+  const TYPE_ICON = {
+    "Saturno Turbo": "⚡", "Single": "🎵", "EP": "💿", "Álbum": "🪐"
+  };
+  const STATUS_LIST = ["Na fila","Planejado","Em produção","Masterização","Pronto para lançar","Lançado","Adiado","Cancelado"];
+  const STATUS_STAGE = {
+    "Na fila": 5, "Planejado": 12, "Em produção": 35, "Masterização": 58,
+    "Pronto para lançar": 80, "Lançado": 100, "Adiado": 100, "Cancelado": 100
+  };
+  const STATUS_COLOR = {
+    "Na fila":"var(--text-dim)", "Planejado":"var(--text-dim)", "Em produção":"var(--warn)", "Masterização":"var(--warn)",
+    "Pronto para lançar":"var(--cyan)", "Lançado":"var(--success)",
+    "Adiado":"var(--danger)", "Cancelado":"var(--danger)"
+  };
+  const COLOR_PALETTE = [
+    "#FF3EA5","#3EEFFF","#9B5CFF","#F2C14E","#4ADE80","#FF8A3D",
+    "#FF5C6C","#5EEAD4","#FFD166","#C77DFF","#38BDF8","#F472B6",
+    "#A3E635","#FB7185"
+  ];
+  const FALLBACK_COLOR = "#8b85a8";
+
+  let releases = [];
+  let artists = [];
+  let activeType = "all";
+  let activeArtistFilter = null;
+  let currentMonth = new Date(); currentMonth.setDate(1);
+  let selectedDay = null;
+  let pendingReturnToRelease = false; // true when artist modal was opened from inside release modal
+  let selectedArtistIds = new Set(); // multi-select state for the release form
+  let selectedColor = null; // color state for the artist form
+
+  const listArea = document.getElementById('listArea');
+  const artistArea = document.getElementById('artistArea');
+  const overlay = document.getElementById('overlay');
+  const overlayArtist = document.getElementById('overlayArtist');
+  const typeSelect = document.getElementById('typeSelect');
+  const artistPicker = document.getElementById('artistPicker');
+  const colorPicker = document.getElementById('colorPicker');
+  const artistLegend = document.getElementById('artistLegend');
+  let formType = null;
+
+  // ---------- banco de dados online (Firebase Firestore) ----------
+  // Cada lançamento e cada artista é um documento nas coleções "releases" e "artists".
+  // A escuta em tempo real (onSnapshot) mantém todos os aparelhos conectados sincronizados sozinhos.
+
+  // Configuração do projeto Firebase da Casa Saturno — já preenchida.
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDUERtfi9gkEGbDWDruSoZdDEs1q0dWOCg",
+    authDomain: "controle-musical---saturno.firebaseapp.com",
+    projectId: "controle-musical---saturno",
+    storageBucket: "controle-musical---saturno.firebasestorage.app",
+    messagingSenderId: "206194227091",
+    appId: "1:206194227091:web:4ff5b332cf65def0541a66"
+  };
+  function embeddedConfigIsFilled(){
+    return FIREBASE_CONFIG.apiKey && !String(FIREBASE_CONFIG.apiKey).startsWith('COLE_AQUI');
+  }
+  const FB_CONFIG_KEY = 'casaSaturno_firebaseConfig';
+  let db = null;
+  let unsubReleases = null;
+  let unsubArtists = null;
+
+  function getSavedConfig(){
+    try{ return JSON.parse(localStorage.getItem(FB_CONFIG_KEY) || 'null'); }
+    catch(e){ return null; }
+  }
+
+  function parseConfigInput(raw){
+    // Extrai cada campo individualmente, tolerando aspas retas ou curvas,
+    // vírgulas ou não, presença ou ausência das chaves { }. Assim, um errinho
+    // de digitação numa chave ou aspas não derruba a leitura inteira.
+    function extractField(text, key){
+      const re = new RegExp(key + '\\s*:\\s*[\'"“”]?\\s*([^\'"“”,\\n}]+)', 'i');
+      const m = text.match(re);
+      return m ? m[1].trim() : null;
+    }
+    const fields = ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'];
+    const obj = {};
+    fields.forEach((f)=>{ const v = extractField(raw, f); if(v) obj[f] = v; });
+    if(!obj.apiKey || !obj.projectId){
+      throw new Error('Não encontrei os campos apiKey e projectId no texto colado. Confira se colou a configuração completa (os 6 campos do Firebase).');
+    }
+    return obj;
+  }
+
+  async function connectFirebase(config){
+    if(!firebase.apps.length){
+      firebase.initializeApp(config);
+    }
+    db = firebase.firestore();
+    try{ await db.enablePersistence({synchronizeTabs:true}); }
+    catch(e){ /* aba múltipla aberta ou navegador sem suporte: segue sem cache offline avançado */ }
+  }
+
+  function attachListeners(){
+    if(unsubReleases) unsubReleases();
+    if(unsubArtists) unsubArtists();
+
+    unsubReleases = db.collection('releases').onSnapshot((snap)=>{
+      releases = snap.docs.map(d=>d.data());
+      renderList();
+      renderCalendar();
+      renderArtists();
+    if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
+    }, (err)=>{
+      console.error(err);
+      showSetupError('Não foi possível ler os lançamentos: ' + err.message);
+      setupScreen.classList.add('show');
+    });
+
+    unsubArtists = db.collection('artists').onSnapshot(async (snap)=>{
+      artists = snap.docs.map(d=>d.data());
+      // migração: garante que todo artista já cadastrado tenha uma cor
+      const missing = artists.filter(a=>!a.cor);
+      if(missing.length){
+        missing.forEach(a=> a.cor = nextSuggestedColor());
+        try{
+          const batch = db.batch();
+          missing.forEach(a=> batch.set(db.collection('artists').doc(a.id), a));
+          await batch.commit();
+        }catch(e){ /* tenta de novo na próxima sincronização */ }
+      }
+      renderArtists();
+    if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
+      renderList();
+      renderCalendar();
+    }, (err)=>{
+      console.error(err);
+      showSetupError('Não foi possível ler os artistas: ' + err.message);
+      setupScreen.classList.add('show');
+    });
+  }
+
+  async function writeRelease(data){ await db.collection('releases').doc(data.id).set(data); }
+  async function deleteReleaseDoc(id){ await db.collection('releases').doc(id).delete(); }
+  async function writeArtist(data){ await db.collection('artists').doc(data.id).set(data); }
+  async function deleteArtistDoc(id){ await db.collection('artists').doc(id).delete(); }
+
+  // ---------- helpers ----------
+  function fmtDate(iso){
+    if(!iso) return '—';
+    const [y,m,d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  function sortedReleases(list){
+    return [...list].sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+  }
+  function releaseArtistIds(r){
+    if(Array.isArray(r.artistaIds) && r.artistaIds.length) return r.artistaIds;
+    if(r.artistaId) return [r.artistaId];
+    return [];
+  }
+  function getArtist(id){ return artists.find(x=>x.id===id); }
+  function getArtistColor(id){
+    const a = getArtist(id);
+    return (a && a.cor) ? a.cor : FALLBACK_COLOR;
+  }
+  function getArtistNames(r){
+    const ids = releaseArtistIds(r);
+    const names = ids.map(id=>{ const a=getArtist(id); return a ? a.nome : null; }).filter(Boolean);
+    if(names.length) return names.join(', ');
+    return r.artista || 'Artista removido';
+  }
+  function nextSuggestedColor(){
+    const used = artists.map(a=>a.cor).filter(Boolean);
+    const free = COLOR_PALETTE.find(c=>!used.includes(c));
+    return free || COLOR_PALETTE[Math.floor(Math.random()*COLOR_PALETTE.length)];
+  }
+  function initials(name){
+    return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  }
+  function escapeHtml(s){
+    return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ---------- list view (releases) ----------
+  function renderList(){
+    let filtered = activeType==='all' ? releases : releases.filter(r=>r.tipo===activeType);
+    if(activeArtistFilter){
+      filtered = filtered.filter(r=>releaseArtistIds(r).includes(activeArtistFilter));
+    }
+    filtered = sortedReleases(filtered);
+
+    const filterArtist = activeArtistFilter ? getArtist(activeArtistFilter) : null;
+    const filterBarHtml = filterArtist
+      ? `<div class="artist-filter-bar">Filtrando por: <b>${escapeHtml(filterArtist.nome)}</b><button type="button" id="clearArtistFilter">✕ limpar</button></div>`
+      : '';
+
+    if(filtered.length===0){
+      listArea.innerHTML = filterBarHtml + `<div class="empty">
+        <div class="glyph">🪐</div>
+        <h3>NENHUM LANÇAMENTO AQUI</h3>
+        <p>${filterArtist ? `${escapeHtml(filterArtist.nome)} ainda não tem lançamento cadastrado.` : (releases.length===0 ? 'Adicione o primeiro lançamento da Casa Saturno tocando em "Novo Lançamento".' : 'Nenhum lançamento cadastrado nesse tipo ainda.')}</p>
+      </div>`;
+      wireFilterBar();
+      return;
+    }
+
+    listArea.innerHTML = filterBarHtml + `<div class="cards">${filtered.map(r=>{
+      const pct = STATUS_STAGE[r.status] ?? 10;
+      const ringColor = STATUS_COLOR[r.status] ?? 'var(--text-dim)';
+      const ids = releaseArtistIds(r);
+      const dots = ids.map(id=>`<span class="mini-artist-dot" style="background:${getArtistColor(id)}"></span>`).join('');
+      const typeLabel = r.tipo ? r.tipo : 'Sem tipo';
+      const typeColor = r.tipo ? TYPE_COLOR[r.tipo] : 'var(--text-dim)';
+      const typeIcon = r.tipo ? TYPE_ICON[r.tipo] : '—';
+      return `<div class="card" data-id="${r.id}">
+        <div class="type-bar" style="background:${typeColor}"></div>
+        <div class="card-top">
+          <div class="card-title">
+            <div class="artist">${dots}<span>${escapeHtml(getArtistNames(r))}</span></div>
+            <div class="track">${escapeHtml(r.titulo||'')}</div>
           </div>
         </div>
-
-        <label class="field-label">Produtor</label>
-        <div class="select-row">
-          <select id="f-produtor"></select>
-          <button type="button" class="btn-small" data-add="produtores">+ Novo</button>
+        <div class="card-meta">
+          <span class="type-pill" style="background:${typeColor}22; color:${typeColor}">${typeIcon} ${typeLabel}</span>
+          <span class="date-tag">${fmtDate(r.data)}</span>
+          ${r.masterData ? `<span class="date-tag">🎚 Master ${fmtDate(r.masterData)}</span>` : ''}
+          ${r.clipeData ? `<span class="date-tag">🎬 Clipe ${fmtDate(r.clipeData)}</span>` : ''}
+          <span class="status-pill" style="background:${ringColor}18; color:${ringColor}">
+            <span class="ring" style="--pct:${pct}; --ring-color:${ringColor}"></span>
+            ${r.status}
+          </span>
         </div>
+      </div>`;
+    }).join('')}</div>`;
 
-        <label class="field-label">Cliente</label>
-        <input id="f-cliente" type="text" placeholder="Opcional — pra quem é a tarefa" />
+    listArea.querySelectorAll('.card').forEach(el=>{
+      el.addEventListener('click', ()=> openEdit(el.dataset.id));
+    });
+    wireFilterBar();
+  }
 
-        <label class="field-label">Status</label>
-        <select id="f-status">
-          <option>Composição</option>
-          <option>Produção</option>
-          <option>Mixagem</option>
-          <option>Masterização</option>
-          <option>Recall</option>
-        </select>
+  function wireFilterBar(){
+    const btn = document.getElementById('clearArtistFilter');
+    if(btn) btn.addEventListener('click', ()=>{ activeArtistFilter = null; renderList(); });
+  }
 
-        <div class="field-grid">
-          <div>
-            <label class="field-label">Entrega da mixagem</label>
-            <input id="f-mix-data" type="date" />
-            <button type="button" id="f-mix-ok-btn" class="btn-small" style="margin-top:6px">💿 Mix OK</button>
-            <p id="f-mix-status" class="field-hint"></p>
+  document.getElementById('chipRow').addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    activeType = chip.dataset.type;
+    renderList();
+  });
+
+  // ---------- artists view ----------
+  function renderArtists(){
+    if(artists.length===0){
+      artistArea.innerHTML = `<div class="empty">
+        <div class="glyph">✦</div>
+        <h3>NENHUM ARTISTA CADASTRADO</h3>
+        <p>Cadastre os artistas da Casa Saturno tocando em "Novo Artista". Todo lançamento precisa estar vinculado a pelo menos um artista já cadastrado.</p>
+      </div>`;
+      return;
+    }
+    const sorted = [...artists].sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+    artistArea.innerHTML = `<div class="cards">${sorted.map(a=>{
+      const count = releases.filter(r=>releaseArtistIds(r).includes(a.id)).length;
+      const cor = a.cor || FALLBACK_COLOR;
+      return `<div class="card artist-card" data-id="${a.id}">
+        <div class="type-bar" style="background:${cor}"></div>
+        <div class="card-top">
+          <div class="avatar" style="background:${cor}">${initials(a.nome)}</div>
+          <div class="card-title">
+            <div class="track" style="margin-top:0;">${escapeHtml(a.nome)}</div>
+            <div class="artist" style="margin-top:3px;"><span>${escapeHtml(a.genero||'Gênero não informado')}</span></div>
           </div>
-          <div>
-            <label class="field-label">Entrega da master</label>
-            <input id="f-master-data" type="date" />
-            <button type="button" id="f-master-ok-btn" class="btn-small" style="margin-top:6px">🎧 Master OK</button>
-            <p id="f-master-status" class="field-hint"></p>
-          </div>
         </div>
-
-        <label class="field-label" style="margin-top:14px">Observações / Recall</label>
-        <textarea id="f-observacoes" rows="3" placeholder="Anotações ou o que precisa ser refeito no recall"></textarea>
-
-        <label class="checkbox-label" style="margin-top:14px">
-          <input id="f-concluida" type="checkbox" /> ✅ Marcar tarefa como concluída
-        </label>
-      </div>
-
-      <button id="save-task-btn" class="btn-primary btn-full">Salvar tarefa</button>
-    </div>
-  </div>
-
-  <!-- ===================== MODAL: MIX OK (link de backup) ===================== -->
-  <div id="mixok-modal" class="modal-overlay hidden">
-    <div class="modal" style="width:360px">
-      <div class="modal-header">
-        <p>💿 Confirmar Mixagem</p>
-        <button id="close-mixok-modal-btn" class="btn-icon">✕</button>
-      </div>
-      <div class="modal-body">
-        <label class="field-label">Link do backup para masterização</label>
-        <input id="mixok-link" type="text" placeholder="https://..." />
-        <p class="field-hint">Sem esse link, a mixagem não pode ser marcada como concluída.</p>
-      </div>
-      <button id="save-mixok-btn" class="btn-primary btn-full">Confirmar Mix OK</button>
-      <button id="remove-mixok-btn" class="btn-ghost btn-full" style="margin-top:8px">Remover confirmação / link</button>
-    </div>
-  </div>
-
-  <!-- ===================== MODAL: MASTER OK (link da master) ===================== -->
-  <div id="masterok-modal" class="modal-overlay hidden">
-    <div class="modal" style="width:360px">
-      <div class="modal-header">
-        <p>🎧 Confirmar Masterização</p>
-        <button id="close-masterok-modal-btn" class="btn-icon">✕</button>
-      </div>
-      <div class="modal-body">
-        <label class="field-label">Link da master</label>
-        <input id="masterok-link" type="text" placeholder="https://..." />
-        <p class="field-hint">Sem esse link, a master não pode ser marcada como concluída.</p>
-      </div>
-      <button id="save-masterok-btn" class="btn-primary btn-full">Confirmar Master OK</button>
-      <button id="remove-masterok-btn" class="btn-ghost btn-full" style="margin-top:8px">Remover confirmação / link</button>
-    </div>
-  </div>
-
-  <!-- ===================== MODAL: NOVA/EDITAR OBRA ===================== -->
-  <div id="obra-modal" class="modal-overlay hidden">
-    <div class="modal">
-      <div class="modal-header">
-        <p id="obra-modal-title">Nova Obra</p>
-        <button id="close-obra-modal-btn" class="btn-icon">✕</button>
-      </div>
-
-      <div class="modal-body">
-        <label class="field-label">Título da obra</label>
-        <input id="o-titulo" type="text" placeholder="Ex: Bang" />
-
-        <label class="field-label">Letra</label>
-        <textarea id="o-letra" rows="4" placeholder="Letra da música"></textarea>
-
-        <label class="field-label">Autores, percentuais e editoras</label>
-        <p class="field-hint">Ex: Pitiko 25% — Editora Mousik</p>
-        <div id="o-autores-list"></div>
-        <div class="select-row" style="margin-top:6px">
-          <select id="o-add-autor-select"></select>
-          <button type="button" id="o-add-autor-btn" class="btn-small">+ Adicionar autor</button>
+        <div class="card-actions">
+          <button type="button" class="mini-action-btn" data-action="edit" data-id="${a.id}">${isEditor ? '✏️ Editar' : '👁 Ver'}</button>
+          <button type="button" class="mini-action-btn" data-action="filter" data-id="${a.id}">🎧 ${count} lançamento${count===1?'':'s'}</button>
         </div>
-        <p id="o-total-label" class="field-hint">Total: 0%</p>
+      </div>`;
+    }).join('')}</div>`;
+
+    artistArea.querySelectorAll('[data-action="edit"]').forEach(el=>{
+      el.addEventListener('click', ()=> openArtistEdit(el.dataset.id));
+    });
+    artistArea.querySelectorAll('[data-action="filter"]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        activeArtistFilter = el.dataset.id;
+        setActiveTab('list');
+        renderList();
+      });
+    });
+  }
+
+  // ---------- view tabs ----------
+  const tabList = document.getElementById('tab-list');
+  const tabCal = document.getElementById('tab-cal');
+  const tabArtists = document.getElementById('tab-artists');
+  const tabReport = document.getElementById('tab-report');
+  const tabChrono = document.getElementById('tab-chrono');
+  const viewList = document.getElementById('view-list');
+  const viewCal = document.getElementById('view-cal');
+  const viewArtists = document.getElementById('view-artists');
+  const viewReport = document.getElementById('view-report');
+  const viewChrono = document.getElementById('view-chrono');
+
+  function setActiveTab(tab){
+    [tabList, tabCal, tabArtists, tabReport, tabChrono].forEach(t=>t.classList.remove('active'));
+    [viewList, viewCal, viewArtists, viewReport, viewChrono].forEach(v=>v.style.display='none');
+    if(tab==='list'){ tabList.classList.add('active'); viewList.style.display=''; }
+    if(tab==='cal'){ tabCal.classList.add('active'); viewCal.style.display=''; renderCalendar(); }
+    if(tab==='artists'){ tabArtists.classList.add('active'); viewArtists.style.display=''; }
+    if(tab==='report'){ tabReport.classList.add('active'); viewReport.style.display=''; renderReport(); }
+    if(tab==='chrono'){ tabChrono.classList.add('active'); viewChrono.style.display=''; renderChrono(); }
+  }
+  tabList.addEventListener('click', ()=> setActiveTab('list'));
+  tabCal.addEventListener('click', ()=> setActiveTab('cal'));
+  tabArtists.addEventListener('click', ()=> setActiveTab('artists'));
+  tabReport.addEventListener('click', ()=> setActiveTab('report'));
+  tabChrono.addEventListener('click', ()=> setActiveTab('chrono'));
+
+  // Os dois botões de ação ficam sempre visíveis, independente da aba ativa
+  document.getElementById('addReleaseBtn').addEventListener('click', ()=> openReleaseAdd());
+  document.getElementById('addArtistBtn').addEventListener('click', ()=> openArtistAdd(false));
+
+  // ---------- calendar ----------
+  const monthLabel = document.getElementById('monthLabel');
+  const calGrid = document.getElementById('calGrid');
+  const dayPanel = document.getElementById('dayPanel');
+  const MONTHS = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"];
+
+  function renderCalendar(){
+    const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
+    monthLabel.textContent = `${MONTHS[m]} ${y}`;
+    const firstDow = new Date(y,m,1).getDay();
+    const daysInMonth = new Date(y,m+1,0).getDate();
+    const todayIso = new Date().toISOString().slice(0,10);
+
+    const byDay = {};
+    const artistsUsedThisMonth = new Set();
+    releases.forEach(r=>{
+      if(!r.data) return;
+      const d = r.data;
+      if(d.slice(0,4)==String(y) && parseInt(d.slice(5,7))===m+1){
+        byDay[d] = byDay[d] || [];
+        byDay[d].push(r);
+        releaseArtistIds(r).forEach(id=>artistsUsedThisMonth.add(id));
+      }
+    });
+
+    let cells = '';
+    for(let i=0;i<firstDow;i++) cells += `<div class="day-cell empty-cell"></div>`;
+    for(let day=1; day<=daysInMonth; day++){
+      const iso = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const evs = byDay[iso] || [];
+      const isToday = iso===todayIso;
+      const dotColors = [];
+      evs.forEach(r=>{
+        const ids = releaseArtistIds(r);
+        if(ids.length){ ids.forEach(id=>dotColors.push(getArtistColor(id))); }
+        else { dotColors.push(FALLBACK_COLOR); }
+      });
+      cells += `<div class="day-cell ${evs.length?'has-events':''} ${isToday?'today':''}" data-date="${iso}">
+        <span class="num">${day}</span>
+        <div class="day-dots">${dotColors.slice(0,6).map(c=>`<span style="background:${c}"></span>`).join('')}</div>
+      </div>`;
+    }
+    calGrid.innerHTML = cells;
+
+    calGrid.querySelectorAll('.day-cell[data-date]').forEach(el=>{
+      el.addEventListener('click', ()=> showDay(el.dataset.date, byDay[el.dataset.date]||[]));
+    });
+
+    // legenda dinâmica: só os artistas com lançamento neste mês
+    if(artistsUsedThisMonth.size===0){
+      artistLegend.innerHTML = `<span class="legend-chip" style="color:var(--text-dim)">Nenhum artista com lançamento neste mês</span>`;
+    } else {
+      const list = artists.filter(a=>artistsUsedThisMonth.has(a.id))
+        .sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
+      artistLegend.innerHTML = list.map(a=>`<span class="legend-chip"><i style="background:${a.cor||FALLBACK_COLOR}"></i>${escapeHtml(a.nome)}</span>`).join('');
+    }
+
+    if(selectedDay){
+      showDay(selectedDay, byDay[selectedDay]||[]);
+    } else {
+      dayPanel.style.display='none';
+    }
+  }
+
+  function showDay(iso, evs){
+    selectedDay = iso;
+    calGrid.querySelectorAll('.day-cell').forEach(el=>{
+      el.classList.toggle('selected', el.dataset.date===iso);
+    });
+    dayPanel.style.display='';
+    const header = `<h4>${fmtDate(iso)}${evs.length ? ' · ' + evs.length + ' lançamento' + (evs.length>1?'s':'') : ''}</h4>`;
+    const list = evs.map(r=>{
+      const ids = releaseArtistIds(r);
+      const dots = ids.length
+        ? ids.map(id=>`<span style="background:${getArtistColor(id)}"></span>`).join('')
+        : `<span style="background:${FALLBACK_COLOR}"></span>`;
+      return `<div class="mini-card" data-id="${r.id}">
+        <div class="mini-dots">${dots}</div>
+        <div class="mini-info">
+          <b>${escapeHtml(getArtistNames(r))} — ${escapeHtml(r.titulo)}</b>
+          <span>${r.tipo || 'Sem tipo'} · ${r.status}</span>
+        </div>
+      </div>`;
+    }).join('');
+    const addBtn = isEditor ? `<button type="button" class="day-add-btn" id="addOnDayBtn">＋ Adicionar lançamento em ${fmtDate(iso)}</button>` : '';
+    dayPanel.innerHTML = header + list + addBtn;
+    dayPanel.querySelectorAll('.mini-card').forEach(el=>{
+      el.addEventListener('click', ()=> openEdit(el.dataset.id));
+    });
+    const addOnDayBtn = document.getElementById('addOnDayBtn');
+    if(addOnDayBtn) addOnDayBtn.addEventListener('click', ()=> openReleaseAdd(iso));
+    requestAnimationFrame(()=>{
+      dayPanel.scrollIntoView({behavior:'smooth', block:'nearest'});
+    });
+  }
+
+  document.getElementById('prevMonth').addEventListener('click', ()=>{
+    currentMonth.setMonth(currentMonth.getMonth()-1);
+    selectedDay=null;
+    renderCalendar();
+  });
+  document.getElementById('nextMonth').addEventListener('click', ()=>{
+    currentMonth.setMonth(currentMonth.getMonth()+1);
+    selectedDay=null;
+    renderCalendar();
+  });
+
+  // ---------- relatório ----------
+  let reportType = 'all';
+  let reportArtistId = '';
+  const reportChipRow = document.getElementById('reportChipRow');
+  const reportArtistSelect = document.getElementById('reportArtistSelect');
+  const reportDateFrom = document.getElementById('reportDateFrom');
+  const reportDateTo = document.getElementById('reportDateTo');
+  const reportSummary = document.getElementById('reportSummary');
+  const reportTableWrap = document.getElementById('reportTableWrap');
+
+  function populateReportArtistSelect(){
+    const sorted = [...artists].sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+    const prev = reportArtistSelect.value;
+    reportArtistSelect.innerHTML = '<option value="">Todos os artistas</option>' +
+      sorted.map(a=>`<option value="${a.id}">${escapeHtml(a.nome)}</option>`).join('');
+    reportArtistSelect.value = sorted.some(a=>a.id===prev) ? prev : '';
+  }
+
+  function getReportFiltered(){
+    let list = [...releases];
+    if(reportType !== 'all') list = list.filter(r=>r.tipo===reportType);
+    if(reportArtistId) list = list.filter(r=>releaseArtistIds(r).includes(reportArtistId));
+    if(reportDateFrom.value) list = list.filter(r=> r.data && r.data >= reportDateFrom.value);
+    if(reportDateTo.value) list = list.filter(r=> r.data && r.data <= reportDateTo.value);
+    return sortedReleases(list);
+  }
+
+  function renderReport(){
+    populateReportArtistSelect();
+    const filtered = getReportFiltered();
+    reportSummary.textContent = `${filtered.length} lançamento${filtered.length===1?'':'s'} encontrado${filtered.length===1?'':'s'}`;
+
+    if(filtered.length===0){
+      reportTableWrap.innerHTML = `<div class="empty">
+        <div class="glyph">▦</div>
+        <h3>NENHUM RESULTADO</h3>
+        <p>Ajuste os filtros acima para ver lançamentos aqui.</p>
+      </div>`;
+      return;
+    }
+
+    reportTableWrap.innerHTML = `<div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>Artista(s)</th><th>Título</th><th>Tipo</th><th>Status</th><th>Data</th><th>Master</th><th>Clipe</th>
+      </tr></thead>
+      <tbody>${filtered.map(r=>`<tr>
+        <td>${escapeHtml(getArtistNames(r))}</td>
+        <td>${escapeHtml(r.titulo||'')}</td>
+        <td>${escapeHtml(r.tipo||'Sem tipo')}</td>
+        <td>${escapeHtml(r.status||'')}</td>
+        <td>${fmtDate(r.data)}</td>
+        <td>${r.masterData ? fmtDate(r.masterData) : '—'}</td>
+        <td>${r.clipeData ? fmtDate(r.clipeData) : '—'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
+  reportChipRow.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    reportChipRow.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    reportType = chip.dataset.type;
+    renderReport();
+  });
+  reportArtistSelect.addEventListener('change', ()=>{ reportArtistId = reportArtistSelect.value; renderReport(); });
+  reportDateFrom.addEventListener('change', renderReport);
+  reportDateTo.addEventListener('change', renderReport);
+  document.getElementById('reportClearFilters').addEventListener('click', ()=>{
+    reportType = 'all';
+    reportArtistId = '';
+    reportChipRow.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.dataset.type==='all'));
+    reportArtistSelect.value = '';
+    reportDateFrom.value = '';
+    reportDateTo.value = '';
+    renderReport();
+  });
+
+  document.getElementById('reportExportBtn').addEventListener('click', ()=>{
+    const filtered = getReportFiltered();
+    if(filtered.length===0){ alert('Não há lançamentos para exportar com esses filtros.'); return; }
+    if(typeof XLSX === 'undefined'){ alert('A biblioteca de planilha não carregou. Verifique sua conexão e tente de novo.'); return; }
+    const rows = filtered.map(r=>({
+      'Artista(s)': getArtistNames(r),
+      'Título': r.titulo || '',
+      'Tipo': r.tipo || 'Sem tipo',
+      'Status': r.status || '',
+      'Data de Lançamento': r.data || '',
+      'Entrega do Master': r.masterData || '',
+      'Entrega do Clipe': r.clipeData || '',
+      'Gênero': r.genero || '',
+      'ISRC': r.isrc || '',
+      'UPC/EAN': r.upc || '',
+      'Distribuidora': r.distribuidora || '',
+      'Responsável': r.responsavel || '',
+      'Observações': r.obs || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lançamentos');
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `relatorio-casa-saturno-${stamp}.xlsx`);
+  });
+
+  // ---------- cronograma ----------
+  const CHRONO_PX_PER_DAY = 14;
+  const CHRONO_LABEL_WIDTH = 168;
+  let chronoType = 'all';
+  const chronoChipRow = document.getElementById('chronoChipRow');
+  const chronoWrap = document.getElementById('chronoWrap');
+
+  function isoToTime(iso){ return new Date(iso + 'T00:00:00').getTime(); }
+
+  function computeChronoRange(list){
+    let min = null, max = null;
+    list.forEach(r=>{
+      [r.masterData, r.clipeData, r.data].forEach(d=>{
+        if(!d) return;
+        const t = isoToTime(d);
+        if(min===null || t<min) min = t;
+        if(max===null || t>max) max = t;
+      });
+    });
+    const todayT = isoToTime(new Date().toISOString().slice(0,10));
+    if(min===null){ min = todayT - 14*86400000; max = todayT + 60*86400000; }
+    min -= 7*86400000;
+    max += 7*86400000;
+    const minDate = new Date(min);
+    const dow = minDate.getDay();
+    const diffToMonday = (dow===0 ? 6 : dow-1);
+    minDate.setHours(0,0,0,0);
+    minDate.setDate(minDate.getDate() - diffToMonday);
+    return { min: minDate.getTime(), max };
+  }
+
+  function renderChrono(){
+    let list = releases.filter(r=>r.data);
+    if(chronoType !== 'all') list = list.filter(r=>r.tipo===chronoType);
+    list = sortedReleases(list);
+
+    if(list.length===0){
+      chronoWrap.innerHTML = `<div class="empty">
+        <div class="glyph">🗓</div>
+        <h3>NADA PARA MOSTRAR AQUI</h3>
+        <p>Cadastre lançamentos com data para ver o cronograma.</p>
+      </div>`;
+      return;
+    }
+
+    const range = computeChronoRange(list);
+    const totalDays = Math.max(7, Math.ceil((range.max - range.min) / 86400000));
+    const totalWidth = totalDays * CHRONO_PX_PER_DAY;
+
+    function xPos(iso){
+      return Math.max(0, (isoToTime(iso) - range.min) / 86400000 * CHRONO_PX_PER_DAY);
+    }
+
+    let ticks = '';
+    for(let t = range.min; t <= range.max; t += 7*86400000){
+      const left = (t - range.min) / 86400000 * CHRONO_PX_PER_DAY;
+      const label = new Date(t).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+      ticks += `<div style="position:absolute; left:${left}px; top:0; bottom:0; border-left:1px dashed var(--line); font-size:10px; color:var(--text-dim); padding:6px 0 0 4px; font-family:'JetBrains Mono',monospace; white-space:nowrap;">${label}</div>`;
+    }
+
+    const todayIso = new Date().toISOString().slice(0,10);
+    const todayX = xPos(todayIso);
+    const todayLine = `<div class="chrono-today-line" style="left:${CHRONO_LABEL_WIDTH + todayX}px;" title="Hoje"></div>`;
+
+    const rowsHtml = list.map(r=>{
+      const ringColor = STATUS_COLOR[r.status] ?? 'var(--text-dim)';
+      const endX = xPos(r.data);
+      const startCandidates = [r.masterData, r.clipeData, r.data].filter(Boolean).map(xPos);
+      const startX = Math.min(...startCandidates);
+      const barLeft = Math.min(startX, endX);
+      const barWidth = Math.max(6, Math.abs(endX - startX));
+      let markers = '';
+      if(r.masterData) markers += `<div class="chrono-marker" style="left:${xPos(r.masterData)}px; background:var(--warn);" title="Master: ${fmtDate(r.masterData)}">🎚</div>`;
+      if(r.clipeData) markers += `<div class="chrono-marker" style="left:${xPos(r.clipeData)}px; background:var(--cyan);" title="Clipe: ${fmtDate(r.clipeData)}">🎬</div>`;
+      markers += `<div class="chrono-marker" style="left:${endX}px; background:${ringColor}; color:#0a0a16;" title="Lançamento: ${fmtDate(r.data)}">●</div>`;
+      return `<div class="chrono-row" data-id="${r.id}">
+        <div class="chrono-label"><b>${escapeHtml(getArtistNames(r))}</b><span>${escapeHtml(r.titulo||'')}</span></div>
+        <div class="chrono-lane" style="width:${totalWidth}px;">
+          <div class="chrono-bar" style="left:${barLeft}px; width:${barWidth}px; background:${ringColor}66;"></div>
+          ${markers}
+        </div>
+      </div>`;
+    }).join('');
+
+    chronoWrap.innerHTML = `<div class="chrono-scroll"><div style="position:relative;">
+      ${todayLine}
+      <div class="chrono-row" style="border-bottom:1px solid var(--line);">
+        <div class="chrono-label" style="font-family:'Orbitron',sans-serif; font-size:10px; letter-spacing:.5px; color:var(--text-dim); text-transform:uppercase;">Lançamentos</div>
+        <div class="chrono-lane" style="width:${totalWidth}px; height:34px;">${ticks}</div>
       </div>
+      ${rowsHtml}
+    </div></div>`;
 
-      <button id="save-obra-btn" class="btn-primary btn-full">Salvar obra</button>
-    </div>
-  </div>
+    chronoWrap.querySelectorAll('.chrono-row[data-id]').forEach(el=>{
+      el.addEventListener('click', ()=> openEdit(el.dataset.id));
+    });
+  }
 
-  <!-- ===================== MODAL: VER OBRA (somente leitura) ===================== -->
-  <div id="obra-view-modal" class="modal-overlay hidden">
-    <div class="modal">
-      <div class="modal-header">
-        <p id="ov-titulo">Obra</p>
-        <button id="close-obra-view-modal-btn" class="btn-icon">✕</button>
-      </div>
-      <div class="modal-body">
-        <p class="field-label">Autores, percentuais e editoras</p>
-        <div id="ov-autores-list"></div>
+  chronoChipRow.addEventListener('click', (e)=>{
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    chronoChipRow.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    chronoType = chip.dataset.type;
+    renderChrono();
+  });
 
-        <p class="field-label" style="margin-top:14px">Letra</p>
-        <p id="ov-letra" class="obra-view-letra"></p>
-      </div>
-      <button id="obra-view-edit-btn" class="btn-primary btn-full">Editar</button>
-    </div>
-  </div>
+  // ---------- release modal / form ----------
+  const form = document.getElementById('releaseForm');
+  const modalTitle = document.getElementById('modalTitle');
+  const editMeta = document.getElementById('editMeta');
+  const deleteBtn = document.getElementById('deleteBtn');
+  const saveReleaseBtn = document.getElementById('saveReleaseBtn');
+  const quickAddArtistBtn = document.getElementById('quickAddArtist');
+  const noArtistWarn = document.getElementById('noArtistWarn');
+  const statusList = document.getElementById('statusList');
+  let formStatus = 'Na fila';
 
-  <!-- Firebase (SDK compat, sem necessidade de build) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  function renderStatusList(){
+    statusList.innerHTML = STATUS_LIST.map((s)=>{
+      const sel = formStatus === s;
+      return `<div class="status-opt ${sel?'sel':''}" data-status="${s}"><span class="box"></span>${s}</div>`;
+    }).join('');
+    statusList.querySelectorAll('.status-opt').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        formStatus = el.dataset.status;
+        renderStatusList();
+      });
+    });
+  }
 
-  <!-- Exportação de relatórios -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  function fmtDateTime(iso){
+    if(!iso) return '';
+    try{
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+    }catch(e){ return ''; }
+  }
 
-  <script src="firebase-config.js"></script>
-  <script src="app.js"></script>
+  function renderArtistPicker(){
+    if(artists.length===0){
+      artistPicker.innerHTML = `<span class="none-msg">Nenhum artista cadastrado ainda.</span>`;
+      return;
+    }
+    const sorted = [...artists].sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+    artistPicker.innerHTML = sorted.map(a=>{
+      const sel = selectedArtistIds.has(a.id);
+      const cor = a.cor || FALLBACK_COLOR;
+      const style = sel ? `background:${cor}; border-color:${cor};` : `border-color:${cor}66;`;
+      return `<div class="artist-chip ${sel?'sel':''}" data-id="${a.id}" style="${style}"><span class="mark" style="background:${cor}"></span>${escapeHtml(a.nome)}</div>`;
+    }).join('');
+    artistPicker.querySelectorAll('.artist-chip').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const id = el.dataset.id;
+        if(selectedArtistIds.has(id)) selectedArtistIds.delete(id);
+        else selectedArtistIds.add(id);
+        renderArtistPicker();
+      });
+    });
+  }
+
+  typeSelect.addEventListener('click', (e)=>{
+    const opt = e.target.closest('.type-opt');
+    if(!opt) return;
+    if(formType === opt.dataset.type){
+      // clicar de novo desmarca (tipo é opcional)
+      formType = null;
+      opt.classList.remove('sel');
+      return;
+    }
+    formType = opt.dataset.type;
+    typeSelect.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('sel'));
+    opt.classList.add('sel');
+  });
+
+  function resetReleaseForm(){
+    form.reset();
+    document.getElementById('releaseId').value='';
+    formType = null;
+    typeSelect.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('sel'));
+    deleteBtn.style.display='none';
+    modalTitle.textContent='Novo Lançamento';
+    editMeta.style.display='none';
+    saveReleaseBtn.style.display='';
+    quickAddArtistBtn.style.display='';
+    formStatus = 'Na fila';
+    renderStatusList();
+    selectedArtistIds = new Set();
+    renderArtistPicker();
+  }
+
+  function openReleaseAdd(prefillDate){
+    resetReleaseForm();
+    if(artists.length===0){
+      noArtistWarn.style.display='';
+      form.style.display='none';
+    } else {
+      noArtistWarn.style.display='none';
+      form.style.display='';
+    }
+    if(prefillDate){ document.getElementById('fData').value = prefillDate; }
+    overlay.classList.add('show');
+  }
+
+  function openEdit(id){
+    const r = releases.find(x=>x.id===id);
+    if(!r) return;
+    resetReleaseForm();
+    noArtistWarn.style.display='none';
+    form.style.display='';
+    document.getElementById('releaseId').value = r.id;
+    selectedArtistIds = new Set(releaseArtistIds(r));
+    renderArtistPicker();
+    document.getElementById('fTitulo').value = r.titulo||'';
+    document.getElementById('fData').value = r.data||'';
+    document.getElementById('fMasterData').value = r.masterData||'';
+    document.getElementById('fClipeData').value = r.clipeData||'';
+    formStatus = r.status || 'Na fila';
+    renderStatusList();
+    document.getElementById('fGenero').value = r.genero||'';
+    document.getElementById('fResp').value = r.responsavel||'';
+    document.getElementById('fIsrc').value = r.isrc||'';
+    document.getElementById('fUpc').value = r.upc||'';
+    document.getElementById('fDistrib').value = r.distribuidora||'';
+    document.getElementById('fSpotify').value = r.spotify||'';
+    document.getElementById('fYoutube').value = r.youtube||'';
+    document.getElementById('fObs').value = r.obs||'';
+    formType = r.tipo || null;
+    typeSelect.querySelectorAll('.type-opt').forEach(o=>{
+      o.classList.toggle('sel', !!r.tipo && o.dataset.type===r.tipo);
+    });
+    modalTitle.textContent = 'Editar Lançamento';
+    if(r.atualizadoPor){
+      editMeta.style.display = '';
+      editMeta.textContent = `Última edição: ${r.atualizadoPor}${r.atualizadoEm ? ' em ' + fmtDateTime(r.atualizadoEm) : ''}`;
+    } else {
+      editMeta.style.display = 'none';
+    }
+    deleteBtn.style.display = isEditor ? '' : 'none';
+    deleteBtn.dataset.id = r.id;
+    saveReleaseBtn.style.display = isEditor ? '' : 'none';
+    quickAddArtistBtn.style.display = isEditor ? '' : 'none';
+    overlay.classList.add('show');
+  }
+
+  document.getElementById('closeModal').addEventListener('click', ()=> overlay.classList.remove('show'));
+  document.getElementById('cancelBtn').addEventListener('click', ()=> overlay.classList.remove('show'));
+  overlay.addEventListener('click', (e)=>{ if(e.target===overlay) overlay.classList.remove('show'); });
+
+  document.getElementById('quickAddArtist').addEventListener('click', ()=>{
+    pendingReturnToRelease = true;
+    openArtistAdd(true);
+  });
+
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode salvar alterações.'); return; }
+    if(selectedArtistIds.size===0){ alert('Selecione ao menos um artista já cadastrado (ou cadastre um novo).'); return; }
+    const titulo = document.getElementById('fTitulo').value.trim();
+    const dataLanc = document.getElementById('fData').value;
+    if(!titulo){ alert('Informe o título da música.'); return; }
+    if(!dataLanc){ alert('Informe a data de lançamento.'); return; }
+
+    const id = document.getElementById('releaseId').value || ('r' + Date.now() + Math.random().toString(36).slice(2,7));
+    const existing = releases.find(r=>r.id===id);
+    const currentEmail = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconhecido';
+    const nowIso = new Date().toISOString();
+    const data = {
+      id,
+      tipo: formType || '',
+      artistaIds: Array.from(selectedArtistIds),
+      titulo,
+      data: dataLanc,
+      masterData: document.getElementById('fMasterData').value,
+      clipeData: document.getElementById('fClipeData').value,
+      status: formStatus,
+      genero: document.getElementById('fGenero').value.trim(),
+      responsavel: document.getElementById('fResp').value.trim(),
+      isrc: document.getElementById('fIsrc').value.trim(),
+      upc: document.getElementById('fUpc').value.trim(),
+      distribuidora: document.getElementById('fDistrib').value.trim(),
+      spotify: document.getElementById('fSpotify').value.trim(),
+      youtube: document.getElementById('fYoutube').value.trim(),
+      obs: document.getElementById('fObs').value.trim(),
+      criadoPor: (existing && existing.criadoPor) ? existing.criadoPor : currentEmail,
+      criadoEm: (existing && existing.criadoEm) ? existing.criadoEm : nowIso,
+      atualizadoPor: currentEmail,
+      atualizadoEm: nowIso,
+    };
+    const idx = releases.findIndex(r=>r.id===id);
+    if(idx>=0) releases[idx] = data; else releases.push(data);
+    await writeRelease(data);
+    overlay.classList.remove('show');
+    renderList();
+    renderCalendar();
+    renderArtists();
+    if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
+  });
+
+  deleteBtn.addEventListener('click', async ()=>{
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode excluir.'); return; }
+    const id = deleteBtn.dataset.id;
+    if(!confirm('Excluir este lançamento?')) return;
+    releases = releases.filter(r=>r.id!==id);
+    await deleteReleaseDoc(id);
+    overlay.classList.remove('show');
+    renderList();
+    renderCalendar();
+    renderArtists();
+    if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
+  });
+
+  // ---------- artist modal / form ----------
+  const artistForm = document.getElementById('artistForm');
+  const artistModalTitle = document.getElementById('artistModalTitle');
+  const editMetaArtist = document.getElementById('editMetaArtist');
+  const deleteArtistBtn = document.getElementById('deleteArtistBtn');
+  const saveArtistBtn = document.getElementById('saveArtistBtn');
+
+  function renderColorPicker(){
+    colorPicker.innerHTML = COLOR_PALETTE.map(c=>{
+      const sel = selectedColor===c;
+      return `<div class="swatch ${sel?'sel':''}" data-color="${c}" style="background:${c}"><span class="check">✓</span></div>`;
+    }).join('');
+    colorPicker.querySelectorAll('.swatch').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        selectedColor = el.dataset.color;
+        renderColorPicker();
+      });
+    });
+  }
+
+  function resetArtistForm(){
+    artistForm.reset();
+    document.getElementById('artistId').value='';
+    deleteArtistBtn.style.display='none';
+    artistModalTitle.textContent='Novo Artista';
+    editMetaArtist.style.display='none';
+    saveArtistBtn.style.display='';
+    selectedColor = nextSuggestedColor();
+    renderColorPicker();
+  }
+
+  function openArtistAdd(stacked){
+    resetArtistForm();
+    if(stacked){ overlayArtist.classList.add('stacked'); } else { overlayArtist.classList.remove('stacked'); }
+    overlayArtist.classList.add('show');
+  }
+
+  function openArtistEdit(id){
+    const a = artists.find(x=>x.id===id);
+    if(!a) return;
+    resetArtistForm();
+    overlayArtist.classList.remove('stacked');
+    document.getElementById('artistId').value = a.id;
+    document.getElementById('aNome').value = a.nome||'';
+    document.getElementById('aGenero').value = a.genero||'';
+    document.getElementById('aContato').value = a.contato||'';
+    document.getElementById('aRedes').value = a.redes||'';
+    document.getElementById('aObs').value = a.obs||'';
+    selectedColor = a.cor || nextSuggestedColor();
+    renderColorPicker();
+    artistModalTitle.textContent = 'Editar Artista';
+    if(a.atualizadoPor){
+      editMetaArtist.style.display = '';
+      editMetaArtist.textContent = `Última edição: ${a.atualizadoPor}${a.atualizadoEm ? ' em ' + fmtDateTime(a.atualizadoEm) : ''}`;
+    }
+    deleteArtistBtn.style.display = isEditor ? '' : 'none';
+    deleteArtistBtn.dataset.id = a.id;
+    saveArtistBtn.style.display = isEditor ? '' : 'none';
+    overlayArtist.classList.add('show');
+  }
+
+  function closeArtistModal(){
+    overlayArtist.classList.remove('show');
+    overlayArtist.classList.remove('stacked');
+    pendingReturnToRelease = false;
+  }
+  document.getElementById('closeArtistModal').addEventListener('click', closeArtistModal);
+  document.getElementById('cancelArtistBtn').addEventListener('click', closeArtistModal);
+  overlayArtist.addEventListener('click', (e)=>{ if(e.target===overlayArtist) closeArtistModal(); });
+
+  artistForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode salvar alterações.'); return; }
+    const id = document.getElementById('artistId').value || ('a' + Date.now() + Math.random().toString(36).slice(2,7));
+    const existingArtist = artists.find(a=>a.id===id);
+    const currentEmailA = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconhecido';
+    const nowIsoA = new Date().toISOString();
+    const data = {
+      id,
+      nome: document.getElementById('aNome').value.trim(),
+      cor: selectedColor || nextSuggestedColor(),
+      genero: document.getElementById('aGenero').value.trim(),
+      contato: document.getElementById('aContato').value.trim(),
+      redes: document.getElementById('aRedes').value.trim(),
+      obs: document.getElementById('aObs').value.trim(),
+      criadoPor: (existingArtist && existingArtist.criadoPor) ? existingArtist.criadoPor : currentEmailA,
+      criadoEm: (existingArtist && existingArtist.criadoEm) ? existingArtist.criadoEm : nowIsoA,
+      atualizadoPor: currentEmailA,
+      atualizadoEm: nowIsoA,
+    };
+    const idx = artists.findIndex(a=>a.id===id);
+    if(idx>=0) artists[idx] = data; else artists.push(data);
+    await writeArtist(data);
+    renderArtists();
+    if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
+
+    const wasStacked = pendingReturnToRelease;
+    overlayArtist.classList.remove('show');
+    overlayArtist.classList.remove('stacked');
+    pendingReturnToRelease = false;
+
+    if(wasStacked){
+      // volta para o formulário de lançamento com o novo artista já marcado, mantendo os que já estavam selecionados
+      noArtistWarn.style.display='none';
+      form.style.display='';
+      selectedArtistIds.add(id);
+      renderArtistPicker();
+    } else {
+      renderCalendar();
+      renderList();
+    }
+  });
+
+  deleteArtistBtn.addEventListener('click', async ()=>{
+    if(!isEditor){ alert('Você tem acesso somente leitura e não pode excluir.'); return; }
+    const id = deleteArtistBtn.dataset.id;
+    const linked = releases.filter(r=>releaseArtistIds(r).includes(id)).length;
+    const msg = linked>0
+      ? `Este artista tem ${linked} lançamento${linked>1?'s':''} vinculado${linked>1?'s':''}. Excluir mesmo assim?`
+      : 'Excluir este artista?';
+    if(!confirm(msg)) return;
+    artists = artists.filter(a=>a.id!==id);
+    await deleteArtistDoc(id);
+    closeArtistModal();
+    renderArtists();
+    if(typeof renderReport==='function') renderReport();
+    if(typeof renderChrono==='function') renderChrono();
+    renderList();
+    renderCalendar();
+  });
+
+  // ---------- backup (exportar / importar .json — use para guardar uma cópia no Google Drive) ----------
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const payload = { app:'casa-saturno', exportedAt: new Date().toISOString(), releases, artists };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `casa-saturno-backup-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    document.getElementById('importFile').click();
+  });
+
+  document.getElementById('importFile').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev)=>{
+      try{
+        const data = JSON.parse(ev.target.result);
+        if(!Array.isArray(data.releases) || !Array.isArray(data.artists)){
+          throw new Error('formato inválido');
+        }
+        if(!db){ alert('Conecte ao banco de dados primeiro, em "⚙ Conexão".'); return; }
+        if(!confirm(`Este backup tem ${data.releases.length} lançamento(s) e ${data.artists.length} artista(s).\n\nIsso vai SUBSTITUIR os dados do banco online — todos os aparelhos conectados vão ver essa mudança. Continuar?`)) return;
+
+        const [oldReleases, oldArtists] = await Promise.all([
+          db.collection('releases').get(),
+          db.collection('artists').get()
+        ]);
+        const delBatch = db.batch();
+        oldReleases.docs.forEach(d=> delBatch.delete(d.ref));
+        oldArtists.docs.forEach(d=> delBatch.delete(d.ref));
+        await delBatch.commit();
+
+        const addBatch = db.batch();
+        data.releases.forEach(r=> addBatch.set(db.collection('releases').doc(r.id), r));
+        data.artists.forEach(a=> addBatch.set(db.collection('artists').doc(a.id), a));
+        await addBatch.commit();
+
+        alert('Backup importado com sucesso.');
+      }catch(err){
+        alert('Não foi possível importar esse arquivo. Verifique se é um backup válido da Casa Saturno (.json exportado por este app).');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- login (Firebase Authentication) ----------
+  const loginScreen = document.getElementById('loginScreen');
+  const loginEmail = document.getElementById('loginEmail');
+  const loginPassword = document.getElementById('loginPassword');
+  const loginError = document.getElementById('loginError');
+
+  function showLoginError(msg){
+    loginError.textContent = msg;
+    loginError.style.display = '';
+  }
+
+  let isEditor = false;
+  const readonlyPill = document.getElementById('readonlyPill');
+
+  async function checkRole(){
+    isEditor = false;
+    try{
+      const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+      if(uid){
+        const snap = await db.collection('roles').doc(uid).get();
+        isEditor = snap.exists && snap.data().role === 'edicao';
+      }
+    }catch(e){
+      isEditor = false;
+    }
+    applyRoleUI();
+  }
+
+  function applyRoleUI(){
+    readonlyPill.classList.toggle('show', !isEditor);
+    document.getElementById('addReleaseBtn').style.display = isEditor ? '' : 'none';
+    document.getElementById('addArtistBtn').style.display = isEditor ? '' : 'none';
+    document.getElementById('importBtn').style.display = isEditor ? '' : 'none';
+    if(typeof renderArtists==='function') renderArtists();
+  }
+
+  function watchAuth(){
+    firebase.auth().onAuthStateChanged(async (user)=>{
+      if(user){
+        loginScreen.classList.remove('show');
+        attachListeners();
+        await checkRole();
+      } else {
+        loginScreen.classList.add('show');
+        isEditor = false;
+        applyRoleUI();
+        if(unsubReleases){ unsubReleases(); unsubReleases = null; }
+        if(unsubArtists){ unsubArtists(); unsubArtists = null; }
+      }
+    });
+  }
+
+  document.getElementById('loginSubmitBtn').addEventListener('click', async ()=>{
+    loginError.style.display = 'none';
+    const email = loginEmail.value.trim();
+    const pass = loginPassword.value;
+    if(!email || !pass){ showLoginError('Preencha e-mail e senha.'); return; }
+    try{
+      await firebase.auth().signInWithEmailAndPassword(email, pass);
+      loginPassword.value = '';
+    }catch(err){
+      const map = {
+        'auth/invalid-email': 'E-mail inválido.',
+        'auth/user-not-found': 'Não existe conta com esse e-mail.',
+        'auth/wrong-password': 'Senha incorreta.',
+        'auth/invalid-credential': 'E-mail ou senha incorretos.',
+        'auth/too-many-requests': 'Muitas tentativas. Espere um pouco e tente de novo.'
+      };
+      showLoginError(map[err.code] || ('Não foi possível entrar: ' + err.message));
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+    if(!confirm('Sair da sua conta neste aparelho?')) return;
+    await firebase.auth().signOut();
+  });
+
+  // ---------- tela de conexão (configurar / trocar o projeto Firebase) ----------
+  const setupScreen = document.getElementById('setupScreen');
+  const fbConfigInput = document.getElementById('fbConfigInput');
+  const setupError = document.getElementById('setupError');
+
+  function showSetupError(msg){
+    setupError.textContent = msg;
+    setupError.style.display = '';
+  }
+  function openSetup(prefill){
+    setupError.style.display = 'none';
+    fbConfigInput.value = prefill ? JSON.stringify(prefill, null, 2) : '';
+    setupScreen.classList.add('show');
+  }
+  document.getElementById('settingsBtn').addEventListener('click', ()=> openSetup(getSavedConfig()));
+
+  document.getElementById('setupSaveBtn').addEventListener('click', async ()=>{
+    setupError.style.display = 'none';
+    let config;
+    try{
+      config = parseConfigInput(fbConfigInput.value);
+    }catch(err){
+      showSetupError(err.message);
+      return;
+    }
+    try{
+      localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(config));
+      await connectFirebase(config);
+      watchAuth();
+      setupScreen.classList.remove('show');
+    }catch(err){
+      showSetupError('Erro ao conectar: ' + err.message);
+    }
+  });
+
+  // ---------- indicador de modo offline ----------
+  const offlinePill = document.getElementById('offlinePill');
+  function updateOnlineStatus(){
+    offlinePill.classList.toggle('show', !navigator.onLine);
+  }
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+
+  // ---------- service worker (permite instalar o app e usar offline) ----------
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{ /* segue sem SW se falhar */ });
+    });
+  }
+
+  // ---------- início ----------
+  (async function boot(){
+    const saved = getSavedConfig();
+    const config = saved || (embeddedConfigIsFilled() ? FIREBASE_CONFIG : null);
+    if(config){
+      try{
+        await connectFirebase(config);
+        watchAuth();
+      }catch(err){
+        openSetup(config);
+        showSetupError('Não foi possível conectar. Verifique a configuração e tente novamente.');
+      }
+    } else {
+      openSetup(null);
+    }
+  })();
+})();
+</script>
 </body>
 </html>
