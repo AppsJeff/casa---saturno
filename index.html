@@ -40,7 +40,7 @@
     --danger:#ff5c6c;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%;}
   body{
     background:
       radial-gradient(ellipse 900px 500px at 15% -10%, rgba(155,92,255,0.28), transparent 60%),
@@ -90,12 +90,14 @@
   .view-tabs{
     display:flex; gap:6px; margin-bottom:16px; background:var(--void-2);
     border:1px solid var(--line); border-radius:12px; padding:4px;
+    overflow-x:auto; scrollbar-width:none;
   }
+  .view-tabs::-webkit-scrollbar{ display:none; }
   .view-tabs button{
-    flex:1; border:none; background:transparent; color:var(--text-dim);
+    flex:0 0 auto; border:none; background:transparent; color:var(--text-dim);
     font-family:'Orbitron', sans-serif; font-size:10.5px; letter-spacing:.6px;
-    padding:11px 4px; border-radius:9px; cursor:pointer; font-weight:700;
-    transition:all .18s ease;
+    padding:11px 14px; border-radius:9px; cursor:pointer; font-weight:700;
+    transition:all .18s ease; white-space:nowrap;
   }
   .view-tabs button.active{
     background:linear-gradient(135deg, var(--violet), #6a2fd9);
@@ -444,12 +446,13 @@
   }
 
   /* ===== backup bar ===== */
-  .backup-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .backup-row{ display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; scrollbar-width:none; }
+  .backup-row::-webkit-scrollbar{ display:none; }
   .backup-btn{
-    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    flex:0 0 auto; display:flex; align-items:center; justify-content:center; gap:6px;
     background:var(--void-2); border:1px solid var(--line); color:var(--text-dim);
-    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; padding:10px; border-radius:10px;
-    cursor:pointer;
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px; padding:10px 16px; border-radius:10px;
+    cursor:pointer; white-space:nowrap;
   }
   .backup-btn:active{ transform:scale(0.98); }
   .offline-pill{
