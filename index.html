@@ -293,6 +293,21 @@
   .artist-chip .mark{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
   .artist-chip.sel{ color:#0a0a16; }
   .artist-picker .none-msg{ font-size:12.5px; color:var(--text-dim); padding:6px; }
+  .track-card{
+    background:var(--void); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px;
+  }
+  .track-card-head{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+  }
+  .track-num{
+    font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:.5px; color:var(--cyan); text-transform:uppercase;
+  }
+  .track-remove{
+    background:none; border:none; color:var(--danger); font-size:13px; cursor:pointer; padding:2px 6px;
+  }
+  .track-card .field{ margin-bottom:10px; }
+  .track-card .field:last-child{ margin-bottom:0; }
+  .track-card .artist-picker{ padding:8px; min-height:auto; }
   .type-select{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
   .type-opt{
     border:1px solid var(--line); border-radius:10px; padding:10px; text-align:center;
@@ -689,25 +704,35 @@
         <input type="text" id="fDistrib" placeholder="Distro Digital">
       </div>
 
-      <div class="row2">
-        <div class="field">
-          <label>ISRC <span class="opt">(opcional)</span></label>
-          <input type="text" id="fIsrc" placeholder="BR-XXX-26-00001">
+      <div id="singleTrackFields">
+        <div class="row2">
+          <div class="field">
+            <label>ISRC <span class="opt">(opcional)</span></label>
+            <input type="text" id="fIsrc" placeholder="BR-XXX-26-00001">
+          </div>
+          <div class="field">
+            <label>UPC / EAN <span class="opt">(opcional)</span></label>
+            <input type="text" id="fUpc" placeholder="1234567891234">
+          </div>
         </div>
-        <div class="field">
-          <label>UPC / EAN <span class="opt">(opcional)</span></label>
-          <input type="text" id="fUpc" placeholder="1234567891234">
+
+        <div class="row2">
+          <div class="field">
+            <label>ISRC do vídeo <span class="opt">(opcional)</span></label>
+            <input type="text" id="fIsrcVideo" placeholder="BR-XXX-26-00002">
+          </div>
+          <div class="field">
+            <label>UPC do vídeo <span class="opt">(opcional)</span></label>
+            <input type="text" id="fUpcVideo" placeholder="1234567891235">
+          </div>
         </div>
       </div>
 
-      <div class="row2">
+      <div id="tracksSection" style="display:none;">
         <div class="field">
-          <label>ISRC do vídeo <span class="opt">(opcional)</span></label>
-          <input type="text" id="fIsrcVideo" placeholder="BR-XXX-26-00002">
-        </div>
-        <div class="field">
-          <label>UPC do vídeo <span class="opt">(opcional)</span></label>
-          <input type="text" id="fUpcVideo" placeholder="1234567891235">
+          <label>Faixas do EP/Álbum <span class="opt">(opcional)</span></label>
+          <div id="tracksList"></div>
+          <button type="button" class="link-btn" id="addTrackBtn" style="margin-top:10px;">＋ adicionar faixa</button>
         </div>
       </div>
 
@@ -868,6 +893,8 @@
   let selectedDay = null;
   let pendingReturnToRelease = false; // true when artist modal was opened from inside release modal
   let selectedArtistIds = new Set(); // multi-select state for the release form
+  let releaseTracks = []; // faixas do EP/Álbum: [{id, nome, isrcAudio, isrcVideo, upcVideo}]
+  let trackArtistSelections = {}; // trackId -> Set(artistIds)
   let selectedColor = null; // color state for the artist form
 
   const listArea = document.getElementById('listArea');
@@ -1068,6 +1095,7 @@
           ${r.masterData ? `<span class="date-tag">🎚 Master ${fmtDate(r.masterData)}</span>` : ''}
           ${r.clipeData ? `<span class="date-tag">🎬 Clipe ${fmtDate(r.clipeData)}</span>` : ''}
           ${r.guiaData ? `<span class="date-tag">🗒 Guia ${fmtDate(r.guiaData)}</span>` : ''}
+          ${(r.faixas && r.faixas.length) ? `<span class="date-tag">🎼 ${r.faixas.length} faixa${r.faixas.length===1?'':'s'}</span>` : ''}
           <span class="status-pill" style="background:${ringColor}18; color:${ringColor}">
             <span class="ring" style="--pct:${pct}; --ring-color:${ringColor}"></span>
             ${r.status}
@@ -1560,12 +1588,110 @@
       // clicar de novo desmarca (tipo é opcional)
       formType = null;
       opt.classList.remove('sel');
+      updateTrackSectionVisibility();
       return;
     }
     formType = opt.dataset.type;
     typeSelect.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('sel'));
     opt.classList.add('sel');
+    updateTrackSectionVisibility();
   });
+
+  function updateTrackSectionVisibility(){
+    const isMulti = formType === 'EP' || formType === 'Álbum';
+    document.getElementById('tracksSection').style.display = isMulti ? '' : 'none';
+    document.getElementById('singleTrackFields').style.display = isMulti ? 'none' : '';
+  }
+
+  function newTrackId(){ return 't' + Date.now() + Math.random().toString(36).slice(2,7); }
+
+  function renderTracks(){
+    const tracksList = document.getElementById('tracksList');
+    if(releaseTracks.length===0){
+      tracksList.innerHTML = `<p style="font-size:12.5px; color:var(--text-dim); margin:0;">Nenhuma faixa adicionada ainda.</p>`;
+      return;
+    }
+    const sortedArtists = [...artists].sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+    tracksList.innerHTML = releaseTracks.map((t, idx)=>{
+      const sel = trackArtistSelections[t.id] || new Set();
+      const chips = sortedArtists.length ? sortedArtists.map(a=>{
+        const isSel = sel.has(a.id);
+        const cor = a.cor || FALLBACK_COLOR;
+        const style = isSel ? `background:${cor}; border-color:${cor};` : `border-color:${cor}66;`;
+        return `<div class="artist-chip ${isSel?'sel':''}" data-track-id="${t.id}" data-artist-id="${a.id}" style="${style}"><span class="mark" style="background:${cor}"></span>${escapeHtml(a.nome)}</div>`;
+      }).join('') : `<span class="none-msg">Nenhum artista cadastrado ainda.</span>`;
+      return `<div class="track-card" data-track-id="${t.id}">
+        <div class="track-card-head">
+          <span class="track-num">Faixa ${idx+1}</span>
+          <button type="button" class="track-remove" data-track-id="${t.id}">🗑 remover</button>
+        </div>
+        <div class="field">
+          <label>Nome da faixa</label>
+          <input type="text" class="track-nome" data-track-id="${t.id}" value="${escapeHtml(t.nome)}" placeholder="Nome da faixa">
+        </div>
+        <div class="field">
+          <label>Artista(s) da faixa</label>
+          <div class="artist-picker">${chips}</div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>ISRC (áudio)</label>
+            <input type="text" class="track-isrc" data-track-id="${t.id}" value="${escapeHtml(t.isrcAudio)}" placeholder="BR-XXX-26-00001">
+          </div>
+          <div class="field">
+            <label>ISRC (vídeo)</label>
+            <input type="text" class="track-isrc-video" data-track-id="${t.id}" value="${escapeHtml(t.isrcVideo)}" placeholder="BR-XXX-26-00002">
+          </div>
+        </div>
+        <div class="field">
+          <label>UPC do vídeo</label>
+          <input type="text" class="track-upc-video" data-track-id="${t.id}" value="${escapeHtml(t.upcVideo)}" placeholder="1234567891235">
+        </div>
+      </div>`;
+    }).join('');
+
+    tracksList.querySelectorAll('.artist-chip').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const trackId = el.dataset.trackId;
+        const artistId = el.dataset.artistId;
+        if(!trackArtistSelections[trackId]) trackArtistSelections[trackId] = new Set();
+        const set = trackArtistSelections[trackId];
+        if(set.has(artistId)) set.delete(artistId); else set.add(artistId);
+        renderTracks();
+      });
+    });
+    tracksList.querySelectorAll('.track-remove').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const trackId = el.dataset.trackId;
+        releaseTracks = releaseTracks.filter(t=>t.id!==trackId);
+        delete trackArtistSelections[trackId];
+        renderTracks();
+      });
+    });
+  }
+
+  document.getElementById('addTrackBtn').addEventListener('click', ()=>{
+    const id = newTrackId();
+    releaseTracks.push({id, nome:'', isrcAudio:'', isrcVideo:'', upcVideo:''});
+    trackArtistSelections[id] = new Set(selectedArtistIds);
+    renderTracks();
+  });
+
+  function collectTracksFromDom(){
+    const cards = document.querySelectorAll('#tracksList .track-card');
+    const result = [];
+    cards.forEach(card=>{
+      const id = card.dataset.trackId;
+      const nome = card.querySelector('.track-nome').value.trim();
+      const isrcAudio = card.querySelector('.track-isrc').value.trim();
+      const isrcVideo = card.querySelector('.track-isrc-video').value.trim();
+      const upcVideo = card.querySelector('.track-upc-video').value.trim();
+      const artistaIds = Array.from(trackArtistSelections[id] || []);
+      if(!nome && !isrcAudio && !isrcVideo && !upcVideo && artistaIds.length===0) return; // ignora faixa em branco
+      result.push({id, nome, isrcAudio, isrcVideo, upcVideo, artistaIds});
+    });
+    return result;
+  }
 
   function resetReleaseForm(){
     form.reset();
@@ -1582,6 +1708,10 @@
     renderStatusList();
     selectedArtistIds = new Set();
     renderArtistPicker();
+    releaseTracks = [];
+    trackArtistSelections = {};
+    renderTracks();
+    updateTrackSectionVisibility();
   }
 
   function openReleaseAdd(prefillDate){
@@ -1619,6 +1749,17 @@
     typeSelect.querySelectorAll('.type-opt').forEach(o=>{
       o.classList.toggle('sel', !!r.tipo && o.dataset.type===r.tipo);
     });
+    releaseTracks = (r.faixas||[]).map(f=>({
+      id: f.id || newTrackId(),
+      nome: f.nome||'', isrcAudio: f.isrcAudio||'', isrcVideo: f.isrcVideo||'', upcVideo: f.upcVideo||''
+    }));
+    trackArtistSelections = {};
+    releaseTracks.forEach((t, idx)=>{
+      const orig = (r.faixas||[])[idx];
+      trackArtistSelections[t.id] = new Set(orig && orig.artistaIds ? orig.artistaIds : []);
+    });
+    renderTracks();
+    updateTrackSectionVisibility();
   }
 
   function openEdit(id){
@@ -1685,6 +1826,7 @@
       upc: document.getElementById('fUpc').value.trim(),
       isrcVideo: document.getElementById('fIsrcVideo').value.trim(),
       upcVideo: document.getElementById('fUpcVideo').value.trim(),
+      faixas: (formType === 'EP' || formType === 'Álbum') ? collectTracksFromDom() : [],
       distribuidora: document.getElementById('fDistrib').value.trim(),
       spotify: document.getElementById('fSpotify').value.trim(),
       youtube: document.getElementById('fYoutube').value.trim(),
@@ -1843,6 +1985,7 @@
       form.style.display='';
       selectedArtistIds.add(id);
       renderArtistPicker();
+      renderTracks();
     } else {
       renderCalendar();
       renderList();
