@@ -399,6 +399,13 @@
 
   .loading{ text-align:center; padding:60px 0; color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:13px; }
 
+  /* ===== list date filter ===== */
+  .list-date-filter{
+    display:flex; align-items:flex-end; gap:10px; margin-bottom:14px; flex-wrap:wrap;
+  }
+  .list-date-filter .field{ flex:1 1 120px; min-width:120px; }
+  .list-date-filter #listClearDates{ padding-bottom:11px; white-space:nowrap; }
+
   /* ===== report view ===== */
   .report-filters{
     background:var(--void-2); border:1px solid var(--line); border-radius:14px; padding:14px 14px 6px; margin-bottom:14px;
@@ -509,6 +516,17 @@
       <div class="chip" data-type="Single"><span class="dot Single"></span>🎵 Single</div>
       <div class="chip" data-type="EP"><span class="dot EP"></span>💿 EP</div>
       <div class="chip" data-type="Álbum"><span class="dot Álbum"></span>🪐 Álbum</div>
+    </div>
+    <div class="list-date-filter">
+      <div class="field" style="margin-bottom:0;">
+        <label>De</label>
+        <input type="date" id="listDateFrom">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Até</label>
+        <input type="date" id="listDateTo">
+      </div>
+      <button type="button" class="link-btn" id="listClearDates">✕ limpar datas</button>
     </div>
     <div id="listArea"><div class="loading">carregando lançamentos…</div></div>
   </div>
@@ -636,6 +654,11 @@
       </div>
 
       <div class="field">
+        <label>Entrega da guia <span class="opt">(opcional)</span></label>
+        <input type="date" id="fGuiaData">
+      </div>
+
+      <div class="field">
         <label>Tipo de lançamento <span class="opt">(opcional)</span></label>
         <div class="type-select" id="typeSelect">
           <div class="type-opt" data-type="Saturno Turbo">⚡ SATURNO TURBO</div>
@@ -679,6 +702,17 @@
 
       <div class="row2">
         <div class="field">
+          <label>ISRC do vídeo <span class="opt">(opcional)</span></label>
+          <input type="text" id="fIsrcVideo" placeholder="BR-XXX-26-00002">
+        </div>
+        <div class="field">
+          <label>UPC do vídeo <span class="opt">(opcional)</span></label>
+          <input type="text" id="fUpcVideo" placeholder="1234567891235">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
           <label>Link Spotify <span class="opt">(opcional)</span></label>
           <input type="url" id="fSpotify" placeholder="https://open.spotify.com/...">
         </div>
@@ -695,6 +729,7 @@
 
       <div class="modal-actions">
         <button type="button" class="btn danger" id="deleteBtn" style="display:none;">Excluir</button>
+        <button type="button" class="btn ghost" id="duplicateBtn" style="display:none;">📋 Duplicar</button>
         <button type="button" class="btn ghost" id="cancelBtn">Cancelar</button>
         <button type="submit" class="btn primary" id="saveReleaseBtn">Salvar</button>
       </div>
@@ -808,13 +843,13 @@
   const TYPE_ICON = {
     "Saturno Turbo": "⚡", "Single": "🎵", "EP": "💿", "Álbum": "🪐"
   };
-  const STATUS_LIST = ["Na fila","Planejado","Em produção","Masterização","Pronto para lançar","Lançado","Adiado","Cancelado"];
+  const STATUS_LIST = ["Na fila","Planejado","Guia em andamento","Em produção","Masterização","Pronto para lançar","Lançado","Adiado","Cancelado"];
   const STATUS_STAGE = {
-    "Na fila": 5, "Planejado": 12, "Em produção": 35, "Masterização": 58,
+    "Na fila": 5, "Planejado": 12, "Guia em andamento": 22, "Em produção": 35, "Masterização": 58,
     "Pronto para lançar": 80, "Lançado": 100, "Adiado": 100, "Cancelado": 100
   };
   const STATUS_COLOR = {
-    "Na fila":"var(--text-dim)", "Planejado":"var(--text-dim)", "Em produção":"var(--warn)", "Masterização":"var(--warn)",
+    "Na fila":"var(--text-dim)", "Planejado":"var(--text-dim)", "Guia em andamento":"var(--warn)", "Em produção":"var(--warn)", "Masterização":"var(--warn)",
     "Pronto para lançar":"var(--cyan)", "Lançado":"var(--success)",
     "Adiado":"var(--danger)", "Cancelado":"var(--danger)"
   };
@@ -953,6 +988,9 @@
   function sortedReleases(list){
     return [...list].sort((a,b)=> (a.data||'').localeCompare(b.data||''));
   }
+  function sortedReleasesDesc(list){
+    return [...list].sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+  }
   function releaseArtistIds(r){
     if(Array.isArray(r.artistaIds) && r.artistaIds.length) return r.artistaIds;
     if(r.artistaId) return [r.artistaId];
@@ -987,7 +1025,11 @@
     if(activeArtistFilter){
       filtered = filtered.filter(r=>releaseArtistIds(r).includes(activeArtistFilter));
     }
-    filtered = sortedReleases(filtered);
+    const dFrom = document.getElementById('listDateFrom').value;
+    const dTo = document.getElementById('listDateTo').value;
+    if(dFrom) filtered = filtered.filter(r=> r.data && r.data >= dFrom);
+    if(dTo) filtered = filtered.filter(r=> r.data && r.data <= dTo);
+    filtered = sortedReleasesDesc(filtered);
 
     const filterArtist = activeArtistFilter ? getArtist(activeArtistFilter) : null;
     const filterBarHtml = filterArtist
@@ -1025,6 +1067,7 @@
           <span class="date-tag">${fmtDate(r.data)}</span>
           ${r.masterData ? `<span class="date-tag">🎚 Master ${fmtDate(r.masterData)}</span>` : ''}
           ${r.clipeData ? `<span class="date-tag">🎬 Clipe ${fmtDate(r.clipeData)}</span>` : ''}
+          ${r.guiaData ? `<span class="date-tag">🗒 Guia ${fmtDate(r.guiaData)}</span>` : ''}
           <span class="status-pill" style="background:${ringColor}18; color:${ringColor}">
             <span class="ring" style="--pct:${pct}; --ring-color:${ringColor}"></span>
             ${r.status}
@@ -1050,6 +1093,14 @@
     document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
     chip.classList.add('active');
     activeType = chip.dataset.type;
+    renderList();
+  });
+
+  document.getElementById('listDateFrom').addEventListener('change', renderList);
+  document.getElementById('listDateTo').addEventListener('change', renderList);
+  document.getElementById('listClearDates').addEventListener('click', ()=>{
+    document.getElementById('listDateFrom').value = '';
+    document.getElementById('listDateTo').value = '';
     renderList();
   });
 
@@ -1323,9 +1374,12 @@
       'Data de Lançamento': r.data || '',
       'Entrega do Master': r.masterData || '',
       'Entrega do Clipe': r.clipeData || '',
+      'Entrega da Guia': r.guiaData || '',
       'Gênero': r.genero || '',
       'ISRC': r.isrc || '',
       'UPC/EAN': r.upc || '',
+      'ISRC Vídeo': r.isrcVideo || '',
+      'UPC Vídeo': r.upcVideo || '',
       'Distribuidora': r.distribuidora || '',
       'Responsável': r.responsavel || '',
       'Observações': r.obs || '',
@@ -1449,6 +1503,7 @@
   const modalTitle = document.getElementById('modalTitle');
   const editMeta = document.getElementById('editMeta');
   const deleteBtn = document.getElementById('deleteBtn');
+  const duplicateBtn = document.getElementById('duplicateBtn');
   const saveReleaseBtn = document.getElementById('saveReleaseBtn');
   const quickAddArtistBtn = document.getElementById('quickAddArtist');
   const noArtistWarn = document.getElementById('noArtistWarn');
@@ -1518,6 +1573,7 @@
     formType = null;
     typeSelect.querySelectorAll('.type-opt').forEach(o=>o.classList.remove('sel'));
     deleteBtn.style.display='none';
+    duplicateBtn.style.display='none';
     modalTitle.textContent='Novo Lançamento';
     editMeta.style.display='none';
     saveReleaseBtn.style.display='';
@@ -1541,6 +1597,30 @@
     overlay.classList.add('show');
   }
 
+  function fillReleaseFields(r){
+    selectedArtistIds = new Set(releaseArtistIds(r));
+    renderArtistPicker();
+    document.getElementById('fTitulo').value = r.titulo||'';
+    document.getElementById('fData').value = r.data||'';
+    document.getElementById('fMasterData').value = r.masterData||'';
+    document.getElementById('fClipeData').value = r.clipeData||'';
+    document.getElementById('fGuiaData').value = r.guiaData||'';
+    formStatus = r.status || 'Na fila';
+    renderStatusList();
+    document.getElementById('fGenero').value = r.genero||'';
+    document.getElementById('fResp').value = r.responsavel||'';
+    document.getElementById('fIsrc').value = r.isrc||'';
+    document.getElementById('fUpc').value = r.upc||'';
+    document.getElementById('fIsrcVideo').value = r.isrcVideo||'';
+    document.getElementById('fUpcVideo').value = r.upcVideo||'';
+    document.getElementById('fDistrib').value = r.distribuidora||'';
+    document.getElementById('fObs').value = r.obs||'';
+    formType = r.tipo || null;
+    typeSelect.querySelectorAll('.type-opt').forEach(o=>{
+      o.classList.toggle('sel', !!r.tipo && o.dataset.type===r.tipo);
+    });
+  }
+
   function openEdit(id){
     const r = releases.find(x=>x.id===id);
     if(!r) return;
@@ -1548,26 +1628,9 @@
     noArtistWarn.style.display='none';
     form.style.display='';
     document.getElementById('releaseId').value = r.id;
-    selectedArtistIds = new Set(releaseArtistIds(r));
-    renderArtistPicker();
-    document.getElementById('fTitulo').value = r.titulo||'';
-    document.getElementById('fData').value = r.data||'';
-    document.getElementById('fMasterData').value = r.masterData||'';
-    document.getElementById('fClipeData').value = r.clipeData||'';
-    formStatus = r.status || 'Na fila';
-    renderStatusList();
-    document.getElementById('fGenero').value = r.genero||'';
-    document.getElementById('fResp').value = r.responsavel||'';
-    document.getElementById('fIsrc').value = r.isrc||'';
-    document.getElementById('fUpc').value = r.upc||'';
-    document.getElementById('fDistrib').value = r.distribuidora||'';
+    fillReleaseFields(r);
     document.getElementById('fSpotify').value = r.spotify||'';
     document.getElementById('fYoutube').value = r.youtube||'';
-    document.getElementById('fObs').value = r.obs||'';
-    formType = r.tipo || null;
-    typeSelect.querySelectorAll('.type-opt').forEach(o=>{
-      o.classList.toggle('sel', !!r.tipo && o.dataset.type===r.tipo);
-    });
     modalTitle.textContent = 'Editar Lançamento';
     if(r.atualizadoPor){
       editMeta.style.display = '';
@@ -1577,6 +1640,8 @@
     }
     deleteBtn.style.display = isEditor ? '' : 'none';
     deleteBtn.dataset.id = r.id;
+    duplicateBtn.style.display = isEditor ? '' : 'none';
+    duplicateBtn.dataset.id = r.id;
     saveReleaseBtn.style.display = isEditor ? '' : 'none';
     quickAddArtistBtn.style.display = isEditor ? '' : 'none';
     overlay.classList.add('show');
@@ -1612,11 +1677,14 @@
       data: dataLanc,
       masterData: document.getElementById('fMasterData').value,
       clipeData: document.getElementById('fClipeData').value,
+      guiaData: document.getElementById('fGuiaData').value,
       status: formStatus,
       genero: document.getElementById('fGenero').value.trim(),
       responsavel: document.getElementById('fResp').value.trim(),
       isrc: document.getElementById('fIsrc').value.trim(),
       upc: document.getElementById('fUpc').value.trim(),
+      isrcVideo: document.getElementById('fIsrcVideo').value.trim(),
+      upcVideo: document.getElementById('fUpcVideo').value.trim(),
       distribuidora: document.getElementById('fDistrib').value.trim(),
       spotify: document.getElementById('fSpotify').value.trim(),
       youtube: document.getElementById('fYoutube').value.trim(),
@@ -1649,6 +1717,22 @@
     renderArtists();
     if(typeof renderReport==='function') renderReport();
     if(typeof renderChrono==='function') renderChrono();
+  });
+
+  duplicateBtn.addEventListener('click', ()=>{
+    if(!isEditor) return;
+    const r = releases.find(x=>x.id===duplicateBtn.dataset.id);
+    if(!r) return;
+    resetReleaseForm();
+    noArtistWarn.style.display='none';
+    form.style.display='';
+    fillReleaseFields(r);
+    document.getElementById('fTitulo').value = (r.titulo||'') + ' (cópia)';
+    // links de plataformas não são copiados, já que são específicos do lançamento original
+    document.getElementById('fSpotify').value = '';
+    document.getElementById('fYoutube').value = '';
+    modalTitle.textContent = 'Novo Lançamento (cópia)';
+    editMeta.style.display='none';
   });
 
   // ---------- artist modal / form ----------
